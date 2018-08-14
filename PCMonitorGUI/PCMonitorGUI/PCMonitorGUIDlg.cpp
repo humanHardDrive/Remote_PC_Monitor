@@ -189,15 +189,16 @@ void CPCMonitorGUIDlg::LogEvent(CString event)
 
 void CPCMonitorGUIDlg::OnBnClickedConnectbtn()
 {
-	LogEvent(_T("Attempting to connect..."));
-
 	UpdateData(TRUE);
 
 	m_NetworkThread.SetIP(m_IPAddress);
 	m_NetworkThread.SetPort(m_Port);
 
-	if(m_NetworkThread.Connect())
+	if (m_NetworkThread.Connect())
+	{
 		LogEvent(_T("Success"));
+		m_Commander.StartListener();
+	}
 	else
 		LogEvent(_T("Failed"));
 }

@@ -92,6 +92,7 @@
       <Optimization>Disabled</Optimization>
       <PreprocessorDefinitions>WIN32;_WINDOWS;_DEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <SDLCheck>true</SDLCheck>
+      <AdditionalIncludeDirectories>$(SolutionDir)..\PC_Monitor_Hardware\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -185,8 +186,8 @@
     <Text Include="ReadMe.txt" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="..\..\PC_Monitor_Hardware\Msgs.h" />
     <ClInclude Include="Commander.h" />
-    <ClInclude Include="Msgs.h" />
     <ClInclude Include="NetworkThread.h" />
     <ClInclude Include="PCMonitorGUI.h" />
     <ClInclude Include="PCMonitorGUIDlg.h" />

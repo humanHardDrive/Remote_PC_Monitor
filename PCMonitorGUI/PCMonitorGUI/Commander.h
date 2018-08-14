@@ -16,6 +16,8 @@ class Commander
 
 	void SetNetworkThread(NetworkThread *nt);
 
+	void StartListener();
+
 	void SendFile(CString path);
 	void ValidateFile(CString path);
 	void LoadFile();

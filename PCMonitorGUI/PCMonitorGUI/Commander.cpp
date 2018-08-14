@@ -14,6 +14,11 @@ void Commander::SetNetworkThread(NetworkThread * nt)
 	this->m_NetworkThread = nt;
 }
 
+void Commander::StartListener()
+{
+	m_PacketParseThread = std::thread(&Commander::PacketParsingThread, this);
+}
+
 
 void Commander::ListSensors(uint8_t index, CString name)
 {
@@ -121,7 +126,10 @@ void Commander::PacketParsingThread()
 				case READING_PAYLOAD:
 				payload[k] = buffer[i];
 				checksum += payload[k];
-				if (k >= length)
+
+				k++;
+
+				if (k >= MAX_PAYLOAD_SiZE)
 					m_ParsingState = WAITING_FOR_CHECKSUM;
 				break;
 

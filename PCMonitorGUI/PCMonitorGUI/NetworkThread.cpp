@@ -199,7 +199,7 @@ void NetworkThread::TXHandler()
 void NetworkThread::RXHandler()
 {
 	unsigned char buffer[128];
-	unsigned int bytesread = 0;
+	int bytesread = 0;
 
 	while(!this->m_StopConnection)
 	{

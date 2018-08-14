@@ -39,7 +39,7 @@
     <ClInclude Include="Commander.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="Msgs.h">
+    <ClInclude Include="..\..\PC_Monitor_Hardware\Msgs.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
