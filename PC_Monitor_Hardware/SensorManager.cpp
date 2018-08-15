@@ -15,22 +15,22 @@ SENSOR_ENTRY SensorTable[] =
 {
   { "Current",
     0,
-    1,
+    0,
     l_UpdateCurrentSensor
   },
   { "Voltage",
     0,
-    1,
+    2,
     l_UpdateVoltageSensor
   },
   { "Temperature",
     0,
-    1,
+    0,
     l_UpdateTempSensor
   },
   { "Relative Humidity",
     0,
-    1,
+    0,
     l_UpdateRHSensor
   }
 };
@@ -65,7 +65,7 @@ uint16_t l_UpdateCurrentSensor()
 
 uint16_t l_UpdateVoltageSensor()
 {
-  return 0;
+  return (analogRead(A1) * 330) / 4096;
 }
 
 uint16_t l_UpdateTempSensor()
