@@ -5,6 +5,8 @@
 #include <Arduino.h>
 #include <SPI.h>
 #include <Ethernet.h>
+#include <extEEPROM.h>
+#include <Wire.h>
 
 #include <stdint.h>
 
@@ -13,10 +15,16 @@ uint8_t mac[] = {0xDE, 0xAD, 0xBE, 0xEF, 0xFE, 0xED};
 EthernetServer server(4040);
 EthernetClient client;
 
+extEEPROM l_ExtEEPROM(kbits_1024, 1, EEPROM_PAGE_SIZE);
+
 PARSING_STATE l_CurrentParseState = WAITING_FOR_STX;
 
 uint8_t l_MessageCount = 0;
 PACKET_WRAPPER l_SharePacket;
+
+uint8_t SendFileBuffer[EEPROM_PAGE_SIZE];
+uint16_t CurrentFilePage = 0;
+bool BufferDirty = false;
 
 void l_ParsePacket(uint8_t c);
 void l_HandleCommand(COMMAND_PAYLOAD* p);
@@ -105,11 +113,11 @@ void l_ParsePacket(uint8_t c)
 
     case WAITING_FOR_CHECKSUM:
       Serial.println();
-      
+
       Serial.print(l_SharePacket.checksum, HEX);
       Serial.print(" vs. ");
       Serial.println(c, HEX);
-      
+
       if (c == l_SharePacket.checksum)
         l_HandleCommand((COMMAND_PAYLOAD*)l_SharePacket.payload);
       l_CurrentParseState = WAITING_FOR_STX;
@@ -150,7 +158,7 @@ uint8_t l_CalculateChecksum(PACKET_WRAPPER *p)
   uint8_t i;
   uint8_t checksum = 0;
 
-  for(i = 0; i < sizeof(PACKET_WRAPPER) - 1; i++)
+  for (i = 0; i < sizeof(PACKET_WRAPPER) - 1; i++)
     checksum += *(((uint8_t*)p) + i);
 
   return checksum;
@@ -171,15 +179,15 @@ void l_BuildAndSendPacket(COMMAND_TYPE cmd, uint8_t* buf, uint8_t len)
 
 void l_ProcessSensorList(COMMAND_PAYLOAD* p)
 {
-  LIST_SENSORS_MSG msg;
+  LIST_SENSORS_MSG* msg;
   LIST_SENSORS_RSP rsp;
   SENSOR_ENTRY* sensor = NULL;
-  
-  memcpy(&msg, p->baggage, 1);
 
-  rsp.index = msg.index;
+  msg = (LIST_SENSORS_MSG*)p->baggage;
+
+  rsp.index = msg->index;
   sensor = SensorManager_GetEntry(rsp.index);
-  if(sensor)
+  if (sensor)
   {
     rsp.len = strlen(sensor->name);
     strcpy(rsp.name, sensor->name);
@@ -194,16 +202,16 @@ void l_ProcessSensorList(COMMAND_PAYLOAD* p)
 
 void l_ProcessSensorUpdate(COMMAND_PAYLOAD* p)
 {
-  UPDATE_SENSOR_MSG msg;
+  UPDATE_SENSOR_MSG* msg;
   UPDATE_SENSOR_RSP rsp;
   SENSOR_ENTRY *sensor = NULL;
 
-  memcpy(&msg, p->baggage, 1);
+  msg = (UPDATE_SENSOR_MSG*)p->baggage;
 
-  rsp.index = msg.index;
+  rsp.index = msg->index;
   sensor = SensorManager_GetEntry(rsp.index);
 
-  if(sensor)
+  if (sensor)
   {
     rsp.val = sensor->lastknownval;
     rsp.scalar = sensor->scalar;
@@ -215,5 +223,61 @@ void l_ProcessSensorUpdate(COMMAND_PAYLOAD* p)
   }
 
   l_BuildAndSendPacket(UPDATE_SENSOR, (uint8_t*)&rsp, sizeof(rsp));
+}
+
+void l_ProcessSendFile(COMMAND_PAYLOAD *p)
+{
+  SEND_FILE_MSG* msg;
+  SEND_FILE_RSP rsp;
+  uint16_t desiredpage;
+  uint8_t pageoffset;
+
+  msg = (SEND_FILE_MSG*)p->baggage;
+
+  if (msg->len > 0)
+  {
+    desiredpage = (msg->index) / EEPROM_PAGE_SIZE;
+    pageoffset = (msg->index & 0x40);
+
+    if (desiredpage != CurrentFilePage)
+    {
+      //The first byte is used to detemine whether or not there is a file to load
+      if (BufferDirty)
+        l_ExtEEPROM.write((CurrentFilePage * 128) + 1, SendFileBuffer, EEPROM_PAGE_SIZE);
+
+      l_ExtEEPROM.read((desiredpage * 128) + 1, SendFileBuffer, EEPROM_PAGE_SIZE);
+
+      CurrentFilePage = desiredpage;
+      BufferDirty = false;
+    }
+
+    //Check if data is actually changing, to save the EEPROM from excessive writes
+    if (memcmp(SendFileBuffer + pageoffset, msg->data, msg->len))
+      BufferDirty = true;
+
+    memcpy(SendFileBuffer + pageoffset, msg->data, msg->len);
+
+    rsp.index = msg->index;
+    rsp.ack = 0;
+  }
+  else //A 0 length message forces a flush of whatever is in the page buffer
+  {
+    l_ExtEEPROM.write((CurrentFilePage * 128) + 1, SendFileBuffer, EEPROM_PAGE_SIZE);
+
+    rsp.index = msg->index;
+    rsp.ack = 0;    
+  }
+  
+  l_BuildAndSendPacket(SEND_FILE, (uint8_t*)&rsp, sizeof(rsp));
+}
+
+void l_ProcessLoadFile(COMMAND_PAYLOAD *p)
+{
+
+}
+
+void l_ProcessValidateFile(COMMAND_PAYLOAD *p)
+{
+
 }
 

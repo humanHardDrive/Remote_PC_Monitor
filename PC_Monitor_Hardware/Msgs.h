@@ -50,7 +50,7 @@ struct SEND_FILE_MSG
 {
 	uint32_t index;
 	uint8_t len;
-	uint8_t data[114];
+	uint8_t data[64];
 };
 
 struct SEND_FILE_RSP
