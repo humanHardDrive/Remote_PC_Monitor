@@ -19,13 +19,13 @@ class NetworkThread
 	NetworkThread();
 	~NetworkThread();
 
-	
-
 	void SetIP(CString IP);
 	void SetPort(CString port);
 
 	bool Connect();
 	void Disconnect();
+
+	bool Connected();
 
 	void write(uint8_t* buf, uint8_t len);
 	uint8_t read(uint8_t* buf, uint8_t len);

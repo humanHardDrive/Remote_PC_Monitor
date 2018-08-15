@@ -7,6 +7,7 @@ NetworkThread::NetworkThread()
 	m_NetworkSocket = INVALID_SOCKET;
 	m_IP = _T("127.0.0.1");
 	m_Port = _T("4041");
+	m_Disconnected = true;
 }
 
 
@@ -31,91 +32,97 @@ void NetworkThread::SetPort(CString port)
 
 bool NetworkThread::Connect()
 {
-	// create WSADATA object
-	WSADATA wsaData;
-	this->m_NetworkSocket = INVALID_SOCKET;
-	int iResult;
-	u_long iMode = 1;
-
-	// holds address info for socket to connect to
-	struct addrinfo *result = NULL,
-		*ptr = NULL,
-		hints;
-
-	// Initialize Winsock
-	iResult = WSAStartup(MAKEWORD(2, 2), &wsaData);
-
-	if(iResult != 0)
+	if (m_Disconnected)
 	{
-		printf("WSAStartup failed with error: %d\n", iResult);
-		return false;
-	}
+		// create WSADATA object
+		WSADATA wsaData;
+		this->m_NetworkSocket = INVALID_SOCKET;
+		int iResult;
+		u_long iMode = 1;
 
-	// set address info
-	ZeroMemory(&hints, sizeof(hints));
-	hints.ai_family = AF_UNSPEC;
-	hints.ai_socktype = SOCK_STREAM;
-	hints.ai_protocol = IPPROTO_TCP;  //TCP connection!!!
+		// holds address info for socket to connect to
+		struct addrinfo *result = NULL,
+			*ptr = NULL,
+			hints;
 
-	//resolve server address and port
-	iResult = getaddrinfo("192.168.1.177", "4040", &hints, &result);
+		// Initialize Winsock
+		iResult = WSAStartup(MAKEWORD(2, 2), &wsaData);
 
-	if(iResult != 0)
-	{
-		WSACleanup();
-		return false;
-	}
+		if (iResult != 0)
+		{
+			printf("WSAStartup failed with error: %d\n", iResult);
+			return false;
+		}
 
-	// Attempt to connect to an address until one succeeds
-	for(ptr = result; ptr != NULL; ptr = ptr->ai_next)
-	{
+		// set address info
+		ZeroMemory(&hints, sizeof(hints));
+		hints.ai_family = AF_UNSPEC;
+		hints.ai_socktype = SOCK_STREAM;
+		hints.ai_protocol = IPPROTO_TCP;  //TCP connection!!!
 
-		// Create a SOCKET for connecting to server
-		this->m_NetworkSocket = socket(ptr->ai_family, ptr->ai_socktype,
-										ptr->ai_protocol);
+		//resolve server address and port
+		iResult = getaddrinfo("192.168.1.177", "4040", &hints, &result);
 
-		if(this->m_NetworkSocket == INVALID_SOCKET)
+		if (iResult != 0)
 		{
 			WSACleanup();
 			return false;
 		}
 
-		// Connect to server.
-		iResult = connect(this->m_NetworkSocket, ptr->ai_addr, (int)ptr->ai_addrlen);
-
-		if(iResult == SOCKET_ERROR)
+		// Attempt to connect to an address until one succeeds
+		for (ptr = result; ptr != NULL; ptr = ptr->ai_next)
 		{
-			closesocket(this->m_NetworkSocket);
-			this->m_NetworkSocket = INVALID_SOCKET;
+
+			// Create a SOCKET for connecting to server
+			this->m_NetworkSocket = socket(ptr->ai_family, ptr->ai_socktype,
+				ptr->ai_protocol);
+
+			if (this->m_NetworkSocket == INVALID_SOCKET)
+			{
+				WSACleanup();
+				return false;
+			}
+
+			// Connect to server.
+			iResult = connect(this->m_NetworkSocket, ptr->ai_addr, (int)ptr->ai_addrlen);
+
+			if (iResult == SOCKET_ERROR)
+			{
+				closesocket(this->m_NetworkSocket);
+				this->m_NetworkSocket = INVALID_SOCKET;
+				return false;
+			}
+		}
+
+		// no longer need address info for server
+		freeaddrinfo(result);
+
+		// if connection failed
+		if (this->m_NetworkSocket == INVALID_SOCKET)
+		{
+			WSACleanup();
 			return false;
 		}
+
+		iResult = ioctlsocket(this->m_NetworkSocket, FIONBIO, &iMode);
+		if (iResult == SOCKET_ERROR)
+		{
+			closesocket(this->m_NetworkSocket);
+			WSACleanup();
+			return false;
+		}
+
+		m_StopConnection = false;
+		m_Disconnected = false;
+
+		m_RXThread = std::thread(&NetworkThread::RXHandler, this);
+		m_TXThread = std::thread(&NetworkThread::TXHandler, this);
+		m_UpdateThread = std::thread(&NetworkThread::UpdateHandler, this);
+
+		return true;
 	}
 
-	// no longer need address info for server
-	freeaddrinfo(result);
-
-	// if connection failed
-	if(this->m_NetworkSocket == INVALID_SOCKET)
-	{
-		WSACleanup();
-		return false;
-	}
-
-	iResult = ioctlsocket(this->m_NetworkSocket, FIONBIO, &iMode);
-	if(iResult == SOCKET_ERROR)
-	{
-		closesocket(this->m_NetworkSocket);
-		WSACleanup();
-		return false;
-	}
-
-	m_StopConnection = false;
-	m_Disconnected = false;
-	m_RXThread = std::thread(&NetworkThread::RXHandler, this);
-	m_TXThread = std::thread(&NetworkThread::TXHandler, this);
-	m_UpdateThread = std::thread(&NetworkThread::UpdateHandler, this);
-
-	return true;
+	return false;
 }
 
 void NetworkThread::Disconnect()
@@ -136,10 +143,18 @@ void NetworkThread::Disconnect()
 
 		m_Disconnected = true;
 		m_StopConnection = false;
+
+		if (m_UpdateThread.joinable())
+			m_UpdateThread.join();
 	}
 
 	m_TXQ.empty();
 	m_RXQ.empty();
+}
+
+bool NetworkThread::Connected()
+{
+	return !m_Disconnected;
 }
 
 

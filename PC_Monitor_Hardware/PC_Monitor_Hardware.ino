@@ -1,7 +1,5 @@
-#include <SPI.h>
-#include <Ethernet.h>
-
 #include "Server.h"
+#include "SensorManager.h"
 
 void setup()
 {
@@ -12,6 +10,6 @@ void setup()
 
 void loop()
 {
-  // put your main code here, to run repeatedly:
   Server_Update();
+  SensorManager_Update();
 }

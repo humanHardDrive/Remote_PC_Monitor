@@ -89,5 +89,5 @@ struct UPDATE_SENSOR_RSP
 {
 	uint8_t index;
 	uint16_t val;
-	uint8_t scalar;
+	char scalar;
 };

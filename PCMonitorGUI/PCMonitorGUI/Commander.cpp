@@ -2,6 +2,7 @@
 #include "Commander.h"
 
 #include <string.h>
+#include <cmath>
 
 Commander::Commander()
 {}
@@ -16,11 +17,14 @@ void Commander::SetNetworkThread(NetworkThread * nt)
 
 void Commander::StartListener()
 {
+	if (m_PacketParseThread.joinable())
+		m_PacketParseThread.join();
+
 	m_PacketParseThread = std::thread(&Commander::PacketParsingThread, this);
 }
 
 
-void Commander::ListSensors(uint8_t index, CString name)
+void Commander::ListSensors(uint8_t index, CString& name)
 {
 	LIST_SENSORS_MSG msg;
 	LIST_SENSORS_RSP rsp;
@@ -32,13 +36,16 @@ void Commander::ListSensors(uint8_t index, CString name)
 	payload = WaitOnReturn(LIST_SENSORS);
 
 	memcpy(&rsp, payload->baggage, sizeof(LIST_SENSORS_RSP));
+
+	name = CString(rsp.name, rsp.len);
 }
 
-void Commander::UpdateSensor(uint8_t index)
+float Commander::UpdateSensor(uint8_t index)
 {
 	UPDATE_SENSOR_MSG msg;
 	UPDATE_SENSOR_RSP rsp;
 	COMMAND_PAYLOAD* payload;
+	float res = 0;
 
 	msg.index = index;
 	BuildAndSendPacket(UPDATE_SENSOR, (uint8_t*)&msg, sizeof(msg));
@@ -46,6 +53,10 @@ void Commander::UpdateSensor(uint8_t index)
 	payload = WaitOnReturn(UPDATE_SENSOR);
 
 	memcpy(&rsp, payload->baggage, sizeof(UPDATE_SENSOR_RSP));
+
+	res = (float)rsp.val * pow(10, rsp.scalar);
+
+	return res;
 }
 
 void Commander::BuildAndSendPacket(COMMAND_TYPE cmd, uint8_t* buf, uint8_t len)
@@ -82,9 +93,9 @@ COMMAND_PAYLOAD * Commander::WaitOnReturn(COMMAND_TYPE cmd)
 	m_PayloadMutex.lock();
 	//Clear the waiting flag
 	m_CommandWaiting[cmd].first = false;
-	return &m_CommandWaiting[cmd].second;
 	m_PayloadMutex.unlock();
-}
+
+	return &m_CommandWaiting[cmd].second;}
 
 void Commander::PacketParsingThread()
 {
@@ -92,7 +103,7 @@ void Commander::PacketParsingThread()
 	uint8_t buffer[MAX_WRAPPER_SIZE];
 	uint8_t payload[MAX_PAYLOAD_SiZE];
 
-	while(1)
+	while(m_NetworkThread->Connected())
 	{
 		bytesread = m_NetworkThread->read(buffer, 128);
 
@@ -144,6 +155,7 @@ void Commander::PacketParsingThread()
 
 					m_PayloadMutex.unlock();
 				}
+				m_ParsingState = WAITING_FOR_STX;
 				break;
 			}
 		}

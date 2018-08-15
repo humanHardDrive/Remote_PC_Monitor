@@ -1,5 +1,6 @@
 #include "Server.h"
 #include "Msgs.h"
+#include "SensorManager.h"
 
 #include <Arduino.h>
 #include <SPI.h>
@@ -23,24 +24,27 @@ void l_BuildAndSendPacket(COMMAND_TYPE cmd, uint8_t* buf, uint8_t len);
 
 uint8_t l_CalculateChecksum(PACKET_WRAPPER *p);
 
+void l_ProcessSendFile(COMMAND_PAYLOAD *p);
+void l_ProcessLoadFile(COMMAND_PAYLOAD *p);
+void l_ProcessValidateFile(COMMAND_PAYLOAD *p);
 void l_ProcessSensorList(COMMAND_PAYLOAD* p);
+void l_ProcessSensorUpdate(COMMAND_PAYLOAD *p);
 
 void Server_Begin()
 {
   Ethernet.begin(mac);
   server.begin();
 
-  client = NULL;
-
-  Serial.print("Server is open at ");
-  Serial.println(Ethernet.localIP());
+  client.stop();
 }
 
 
 void Server_Update()
 {
   if (!client)
+  {
     client = server.available();
+  }
   else
   {
     if (client.connected())
@@ -50,8 +54,7 @@ void Server_Update()
     }
     else
     {
-      //client.stop();
-      client = NULL;
+      client.stop();
     }
   }
 }
@@ -60,12 +63,6 @@ void Server_Update()
 void l_ParsePacket(uint8_t c)
 {
   static uint8_t k = 0;
-
-  Serial.print("0x");
-  if ((uint8_t)c < 0x10)
-    Serial.print("0");
-  Serial.print((uint8_t)c, HEX);
-  Serial.print(" ");
 
   switch (l_CurrentParseState)
   {
@@ -125,24 +122,20 @@ void l_HandleCommand(COMMAND_PAYLOAD* p)
   switch (p->cmd)
   {
     case SEND_FILE:
-      Serial.println("SEND_FILE");
       break;
 
     case VALIDATE_FILE:
-      Serial.println("VALIDATE_FILE");
       break;
 
     case LOAD_FILE:
-      Serial.println("LOAD_FILE");
       break;
 
     case LIST_SENSORS:
-      Serial.println("LIST_SENSORS");
       l_ProcessSensorList(p);
       break;
 
     case UPDATE_SENSOR:
-      Serial.println("UPDATE_SENSOR");
+      l_ProcessSensorUpdate(p);
       break;
 
     default:
@@ -180,13 +173,47 @@ void l_ProcessSensorList(COMMAND_PAYLOAD* p)
 {
   LIST_SENSORS_MSG msg;
   LIST_SENSORS_RSP rsp;
+  SENSOR_ENTRY* sensor = NULL;
   
   memcpy(&msg, p->baggage, 1);
 
   rsp.index = msg.index;
-  rsp.len = 10;
-  strcpy(rsp.name, "ABCDEFGHIJ");
+  sensor = SensorManager_GetEntry(rsp.index);
+  if(sensor)
+  {
+    rsp.len = strlen(sensor->name);
+    strcpy(rsp.name, sensor->name);
+  }
+  else
+  {
+    rsp.len = 0;
+  }
 
-  l_BuildAndSendPacket(LIST_SENSORS, (uint8_t*)&rsp, 116);
+  l_BuildAndSendPacket(LIST_SENSORS, (uint8_t*)&rsp, sizeof(rsp));
+}
+
+void l_ProcessSensorUpdate(COMMAND_PAYLOAD* p)
+{
+  UPDATE_SENSOR_MSG msg;
+  UPDATE_SENSOR_RSP rsp;
+  SENSOR_ENTRY *sensor = NULL;
+
+  memcpy(&msg, p->baggage, 1);
+
+  rsp.index = msg.index;
+  sensor = SensorManager_GetEntry(rsp.index);
+
+  if(sensor)
+  {
+    rsp.val = sensor->lastknownval;
+    rsp.scalar = sensor->scalar;
+  }
+  else
+  {
+    rsp.val = 0xFFFF;
+    rsp.scalar = 0;
+  }
+
+  l_BuildAndSendPacket(UPDATE_SENSOR, (uint8_t*)&rsp, sizeof(rsp));
 }
 

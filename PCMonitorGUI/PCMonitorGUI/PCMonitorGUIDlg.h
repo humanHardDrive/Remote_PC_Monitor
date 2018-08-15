@@ -55,9 +55,12 @@ protected:
 	Commander m_Commander;
 
 	std::vector<std::pair<CString, double>> m_SensorList;
+
 	public:
 	afx_msg void OnBnClickedDisconnectbtn();
 	afx_msg void OnBnClickedLstsnsbtn();
 	afx_msg void OnBnClickedSndfilebtn();
 	afx_msg void OnBnClickedValidfilebtn();
+	afx_msg void OnBnClickedUpdatesnsbtn();
+	afx_msg void OnClose();
 };

@@ -75,6 +75,8 @@ BEGIN_MESSAGE_MAP(CPCMonitorGUIDlg, CDialogEx)
 	ON_BN_CLICKED(IDC_LSTSNSBTN, &CPCMonitorGUIDlg::OnBnClickedLstsnsbtn)
 	ON_BN_CLICKED(IDC_SNDFILEBTN, &CPCMonitorGUIDlg::OnBnClickedSndfilebtn)
 	ON_BN_CLICKED(IDC_VALIDFILEBTN, &CPCMonitorGUIDlg::OnBnClickedValidfilebtn)
+	ON_BN_CLICKED(IDC_UPDATESNSBTN, &CPCMonitorGUIDlg::OnBnClickedUpdatesnsbtn)
+	ON_WM_CLOSE()
 END_MESSAGE_MAP()
 
 
@@ -212,19 +214,31 @@ void CPCMonitorGUIDlg::OnBnClickedDisconnectbtn()
 
 void CPCMonitorGUIDlg::OnBnClickedLstsnsbtn()
 {
-	CString test = _T("HELLO");
-
-	m_Commander.ListSensors(0, test);
+	//Handled by background thread
 }
 
 
 void CPCMonitorGUIDlg::OnBnClickedSndfilebtn()
 {
-	// TODO: Add your control notification handler code here
+	//Handled by background thread
 }
 
 
 void CPCMonitorGUIDlg::OnBnClickedValidfilebtn()
 {
-	// TODO: Add your control notification handler code here
+	//Handled by background thread
+}
+
+
+void CPCMonitorGUIDlg::OnBnClickedUpdatesnsbtn()
+{
+	//Handled by background thread
+}
+
+
+void CPCMonitorGUIDlg::OnClose()
+{
+	m_NetworkThread.Disconnect();
+
+	CDialogEx::OnClose();
 }

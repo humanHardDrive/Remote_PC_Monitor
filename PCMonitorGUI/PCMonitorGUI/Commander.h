@@ -22,8 +22,8 @@ class Commander
 	void ValidateFile(CString path);
 	void LoadFile();
 
-	void ListSensors(uint8_t index, CString name);
-	void UpdateSensor(uint8_t index);
+	void ListSensors(uint8_t index, CString& name);
+	float UpdateSensor(uint8_t index);
 
 	private:
 	void BuildAndSendPacket(COMMAND_TYPE cmd, uint8_t* buf, uint8_t len);
