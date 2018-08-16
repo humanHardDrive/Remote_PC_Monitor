@@ -47,6 +47,7 @@ protected:
 
 	void BuildSensorList();
 	void UpdateSensorList();
+	void SendFile();
 
 	public:
 	afx_msg void OnBnClickedConnectbtn();
@@ -66,6 +67,10 @@ protected:
 	std::thread m_BuildSensorListThread;
 	std::thread m_UpdateSensorListThread;
 	std::mutex m_SensorListLock;
+
+	bool m_SendingFile;
+	CString m_FileToSend;
+	std::thread m_SendFileThread;
 
 	public:
 	afx_msg void OnBnClickedDisconnectbtn();

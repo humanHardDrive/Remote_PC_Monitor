@@ -290,7 +290,9 @@ void l_ProcessSendFile(COMMAND_PAYLOAD *p)
           if (SendFileBuffer[i] < 0x10)
             Serial.print('0');
           Serial.print(SendFileBuffer[i], HEX);
+          Serial.print(' ');
         }
+        Serial.println();
 
 #endif
       }
@@ -334,8 +336,9 @@ void l_ProcessSendFile(COMMAND_PAYLOAD *p)
       if (SendFileBuffer[i] < 0x10)
         Serial.print('0');
       Serial.print(SendFileBuffer[i], HEX);
-      Serial.print('\t');
+      Serial.print(' ');
     }
+    Serial.println();
 #endif
 
     rsp.index = msg->index;

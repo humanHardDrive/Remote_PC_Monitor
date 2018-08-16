@@ -250,6 +250,33 @@ void CPCMonitorGUIDlg::UpdateSensorList()
 	m_UpdatingSensorList = false;
 }
 
+void CPCMonitorGUIDlg::SendFile()
+{
+	CFile file;
+	uint8_t buf[EEPROM_PAGE_SIZE / 2];
+	uint32_t index = 0, bytesread = 0;
+
+	if (file.Open(m_FileToSend, CFile::modeRead | CFile::typeBinary))
+	{
+		bytesread = file.Read(buf, EEPROM_PAGE_SIZE / 2);
+
+		while (bytesread > 0)
+		{
+			if (m_Commander.SendFile(index, buf, bytesread))
+			{
+				index += EEPROM_PAGE_SIZE / 2;
+				bytesread = file.Read(buf, EEPROM_PAGE_SIZE / 2);
+			}
+			std::this_thread::yield();
+		}
+
+		while (!m_Commander.SendFile(0, NULL, 0))
+			std::this_thread::yield();
+	}
+
+	m_SendingFile = false;
+}
+
 
 
 void CPCMonitorGUIDlg::OnBnClickedConnectbtn()
@@ -293,19 +320,23 @@ void CPCMonitorGUIDlg::OnBnClickedLstsnsbtn()
 
 void CPCMonitorGUIDlg::OnBnClickedSndfilebtn()
 {
-	uint8_t buffer[EEPROM_PAGE_SIZE / 2];
+	if (m_SendingFile)
+		return;
 
-	for (uint8_t i = 0; i < EEPROM_PAGE_SIZE / 2; i++)
-		buffer[i] = i;
+	if (m_SendFileThread.joinable())
+		m_SendFileThread.join();
 
-	m_Commander.SendFile(0, buffer, EEPROM_PAGE_SIZE / 2);
+	CFileDialog dlg(true, _T("bin"), NULL, OFN_HIDEREADONLY, _T("BIN Files (*.bin)|*.bin|All Files (*.*)|*.*||"), this);
+	if (dlg.DoModal() == IDOK)
+	{
+		m_FileToSend.Empty();
 
-	for (uint8_t i = 0; i < EEPROM_PAGE_SIZE / 2; i++)
-		buffer[i] = EEPROM_PAGE_SIZE/2 - i;
-
-	m_Commander.SendFile(EEPROM_PAGE_SIZE / 2, buffer, EEPROM_PAGE_SIZE / 2);
-
-	m_Commander.SendFile(0, NULL, 0);
+		m_FileToSend.Append(dlg.GetFolderPath());
+		m_FileToSend.Append(_T("\\"));
+		m_FileToSend.Append(dlg.GetFileName());
+		m_SendingFile = true;
+		m_SendFileThread = std::thread(&CPCMonitorGUIDlg::SendFile, this);
+	}
 }
 
 
@@ -323,9 +354,9 @@ void CPCMonitorGUIDlg::OnBnClickedUpdatesnsbtn()
 	if (m_UpdateSensorListThread.joinable())
 		m_UpdateSensorListThread.join();
 
-	m_UpdateSensorListThread = std::thread(&CPCMonitorGUIDlg::UpdateSensorList, this);
-
 	m_UpdatingSensorList = true;
+
+	m_UpdateSensorListThread = std::thread(&CPCMonitorGUIDlg::UpdateSensorList, this);
 }
 
 
@@ -338,6 +369,9 @@ void CPCMonitorGUIDlg::OnClose()
 
 	if (m_UpdateSensorListThread.joinable())
 		m_UpdateSensorListThread.join();
+
+	if (m_SendFileThread.joinable())
+		m_SendFileThread.join();
 
 	CDialogEx::OnClose();
 }
