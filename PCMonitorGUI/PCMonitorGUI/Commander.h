@@ -18,12 +18,12 @@ class Commander
 
 	void StartListener();
 
-	void SendFile(CString path);
-	void ValidateFile(CString path);
-	void LoadFile();
+	bool SendFile(CString path);
+	bool ValidateFile(CString path);
+	bool LoadFile();
 
-	void ListSensors(uint8_t index, CString& name);
-	float UpdateSensor(uint8_t index);
+	bool ListSensors(uint8_t index, CString& name);
+	bool UpdateSensor(uint8_t index, float &val);
 
 	private:
 	void BuildAndSendPacket(COMMAND_TYPE cmd, uint8_t* buf, uint8_t len);

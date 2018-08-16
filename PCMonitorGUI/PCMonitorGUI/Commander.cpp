@@ -24,7 +24,7 @@ void Commander::StartListener()
 }
 
 
-void Commander::ListSensors(uint8_t index, CString& name)
+bool Commander::ListSensors(uint8_t index, CString& name)
 {
 	LIST_SENSORS_MSG msg;
 	LIST_SENSORS_RSP rsp;
@@ -34,29 +34,36 @@ void Commander::ListSensors(uint8_t index, CString& name)
 	BuildAndSendPacket(LIST_SENSORS, (uint8_t*)&msg, sizeof(LIST_SENSORS_MSG));
 
 	payload = WaitOnReturn(LIST_SENSORS);
+	if (payload)
+	{
+		memcpy(&rsp, payload->baggage, sizeof(LIST_SENSORS_RSP));
+		name = CString(rsp.name, rsp.len);
 
-	memcpy(&rsp, payload->baggage, sizeof(LIST_SENSORS_RSP));
+		return true;
+	}
 
-	name = CString(rsp.name, rsp.len);
+	return false;
 }
 
-float Commander::UpdateSensor(uint8_t index)
+bool Commander::UpdateSensor(uint8_t index, float &val)
 {
 	UPDATE_SENSOR_MSG msg;
 	UPDATE_SENSOR_RSP rsp;
 	COMMAND_PAYLOAD* payload;
-	float res = 0;
 
 	msg.index = index;
 	BuildAndSendPacket(UPDATE_SENSOR, (uint8_t*)&msg, sizeof(msg));
 
 	payload = WaitOnReturn(UPDATE_SENSOR);
+	if (payload)
+	{
+		memcpy(&rsp, payload->baggage, sizeof(UPDATE_SENSOR_RSP));
+		val = (float)rsp.val * (float)pow(10, rsp.scalar);
 
-	memcpy(&rsp, payload->baggage, sizeof(UPDATE_SENSOR_RSP));
+		return true;
+	}
 
-	res = (float)rsp.val * pow(10, rsp.scalar);
-
-	return res;
+	return false;
 }
 
 void Commander::BuildAndSendPacket(COMMAND_TYPE cmd, uint8_t* buf, uint8_t len)

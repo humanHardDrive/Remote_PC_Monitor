@@ -114,6 +114,10 @@ BOOL CPCMonitorGUIDlg::OnInitDialog()
 	ShowWindow(SW_SHOW);
 
 	m_Commander.SetNetworkThread(&m_NetworkThread);
+	
+	m_SensorListBuilt = false;
+	m_BuildingSensorList = false;
+	m_UpdatingSensorList = false;
 
 	// TODO: Add extra initialization here
 
@@ -187,6 +191,65 @@ void CPCMonitorGUIDlg::LogEvent(CString event)
 	//UpdateData(FALSE);
 }
 
+void CPCMonitorGUIDlg::BuildSensorList()
+{
+	uint8_t failedmessagecount = 0, index = 0;
+	CString name;
+	bool eolfound = false;
+
+	while (!eolfound && failedmessagecount < 10)
+	{
+		name.Empty();
+		if (m_Commander.ListSensors(index, name))
+		{
+			failedmessagecount = 0;
+			if (name.GetLength() > 0)
+			{
+				std::pair<CString, float> sensor;
+
+				sensor.first = name;
+				if (m_Commander.UpdateSensor(index, sensor.second))
+				{
+					m_SensorListLock.lock();
+					m_SensorList.push_back(sensor);
+					m_SensorListLock.unlock();
+				}
+			}
+			else
+				eolfound = true;
+			index++;
+		}
+		else
+			failedmessagecount++;
+
+		std::this_thread::yield();
+	}
+
+	m_SensorListBuilt = true;
+	m_BuildingSensorList = false;
+}
+
+void CPCMonitorGUIDlg::UpdateSensorList()
+{
+	uint8_t failedmessagecount = 0, index = 0;
+
+	while (index < m_SensorList.size() && failedmessagecount < 10)
+	{
+		m_SensorListLock.lock();
+		if (m_Commander.UpdateSensor(index, m_SensorList[index].second))
+			failedmessagecount = 0;
+		else
+			failedmessagecount++;
+		m_SensorListLock.unlock();
+
+		index++;
+
+		std::this_thread::yield();
+	}
+
+	m_UpdatingSensorList = false;
+}
+
 
 
 void CPCMonitorGUIDlg::OnBnClickedConnectbtn()
@@ -214,7 +277,17 @@ void CPCMonitorGUIDlg::OnBnClickedDisconnectbtn()
 
 void CPCMonitorGUIDlg::OnBnClickedLstsnsbtn()
 {
-	//Handled by background thread
+	if (m_BuildingSensorList || m_UpdatingSensorList)
+		return;
+
+	if (m_BuildSensorListThread.joinable())
+		m_BuildSensorListThread.join();
+
+	m_SensorList.clear();
+	m_BuildingSensorList = true;
+	m_SensorListBuilt = false;
+
+	m_BuildSensorListThread = std::thread(&CPCMonitorGUIDlg::BuildSensorList, this);
 }
 
 
@@ -232,13 +305,27 @@ void CPCMonitorGUIDlg::OnBnClickedValidfilebtn()
 
 void CPCMonitorGUIDlg::OnBnClickedUpdatesnsbtn()
 {
-	//Handled by background thread
+	if (m_BuildingSensorList || m_UpdatingSensorList || !m_SensorListBuilt)
+		return;
+
+	if (m_UpdateSensorListThread.joinable())
+		m_UpdateSensorListThread.join();
+
+	m_UpdateSensorListThread = std::thread(&CPCMonitorGUIDlg::UpdateSensorList, this);
+
+	m_UpdatingSensorList = true;
 }
 
 
 void CPCMonitorGUIDlg::OnClose()
 {
 	m_NetworkThread.Disconnect();
+
+	if (m_BuildSensorListThread.joinable())
+		m_BuildSensorListThread.join();
+
+	if (m_UpdateSensorListThread.joinable())
+		m_UpdateSensorListThread.join();
 
 	CDialogEx::OnClose();
 }

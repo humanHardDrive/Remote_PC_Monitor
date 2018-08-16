@@ -5,6 +5,9 @@
 #include <vector>
 #include <utility>
 
+#include <thread>
+#include <mutex>
+
 #include "NetworkThread.h"
 #include "Commander.h"
 
@@ -42,6 +45,9 @@ protected:
 
 	void LogEvent(CString event);
 
+	void BuildSensorList();
+	void UpdateSensorList();
+
 	public:
 	afx_msg void OnBnClickedConnectbtn();
 
@@ -54,7 +60,12 @@ protected:
 	NetworkThread m_NetworkThread;
 	Commander m_Commander;
 
-	std::vector<std::pair<CString, double>> m_SensorList;
+	std::vector<std::pair<CString, float>> m_SensorList;
+
+	bool m_BuildingSensorList, m_UpdatingSensorList, m_SensorListBuilt;
+	std::thread m_BuildSensorListThread;
+	std::thread m_UpdateSensorListThread;
+	std::mutex m_SensorListLock;
 
 	public:
 	afx_msg void OnBnClickedDisconnectbtn();
