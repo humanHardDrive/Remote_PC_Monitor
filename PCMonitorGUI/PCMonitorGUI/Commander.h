@@ -18,7 +18,7 @@ class Commander
 
 	void StartListener();
 
-	bool SendFile(CString path);
+	bool SendFile(uint32_t index, uint8_t* buf, uint8_t len);
 	bool ValidateFile(CString path);
 	bool LoadFile();
 

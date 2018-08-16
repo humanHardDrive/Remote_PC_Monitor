@@ -3,6 +3,7 @@
 
 #include <string.h>
 #include <cmath>
+#include <chrono>
 
 Commander::Commander()
 {}
@@ -21,6 +22,33 @@ void Commander::StartListener()
 		m_PacketParseThread.join();
 
 	m_PacketParseThread = std::thread(&Commander::PacketParsingThread, this);
+}
+
+bool Commander::SendFile(uint32_t index, uint8_t * buf, uint8_t len)
+{
+	SEND_FILE_MSG msg;
+	SEND_FILE_RSP rsp;
+	COMMAND_PAYLOAD *payload;
+
+	if (len > EEPROM_PAGE_SIZE / 2)
+		return false;
+
+	msg.index = index;
+	msg.len = len;
+	if(len > 0)
+		memcpy(msg.data, buf, len);
+	
+	BuildAndSendPacket(SEND_FILE, (uint8_t*)&msg, sizeof(msg));
+
+	payload = WaitOnReturn(SEND_FILE);
+	if (payload)
+	{
+		memcpy(&rsp, payload->baggage, sizeof(rsp));
+
+		return true;
+	}
+
+	return false;
 }
 
 
@@ -95,7 +123,16 @@ uint8_t Commander::CalculateChecksum(PACKET_WRAPPER * wrapper)
 
 COMMAND_PAYLOAD * Commander::WaitOnReturn(COMMAND_TYPE cmd)
 {
-	while (!m_CommandWaiting[cmd].first); //Need to add a timeout
+	std::chrono::steady_clock::time_point end;
+	std::chrono::steady_clock::time_point start = std::chrono::steady_clock::now();
+
+	do 
+	{
+		end = std::chrono::steady_clock::now();
+	}while (!m_CommandWaiting[cmd].first && std::chrono::duration_cast<std::chrono::seconds>(end - start).count() < 1);
+
+	if (std::chrono::duration_cast<std::chrono::seconds>(end - start).count() >= 1)
+		return NULL;
 
 	m_PayloadMutex.lock();
 	//Clear the waiting flag

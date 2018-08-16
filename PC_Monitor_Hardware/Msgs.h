@@ -8,6 +8,8 @@
 #define MAX_PAYLOAD_SiZE		124
 #define MAX_BAGGAGE_SIZE		123
 
+#define EEPROM_PAGE_SIZE		128
+
 enum COMMAND_TYPE
 {
 	NO_COMMAND = 0,
@@ -52,7 +54,7 @@ struct SEND_FILE_MSG
 {
 	uint32_t index;
 	uint8_t len;
-	uint8_t data[64];
+	uint8_t data[EEPROM_PAGE_SIZE/2];
 };
 
 struct SEND_FILE_RSP

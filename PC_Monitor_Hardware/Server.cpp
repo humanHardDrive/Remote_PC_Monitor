@@ -43,6 +43,11 @@ void Server_Begin()
   Ethernet.begin(mac);
   server.begin();
 
+#ifdef __DEBUG__
+  Serial.print("Server is open at ");
+  Serial.println(Ethernet.localIP());
+#endif
+
   client.stop();
 }
 
@@ -52,6 +57,11 @@ void Server_Update()
   if (!client)
   {
     client = server.available();
+
+#ifdef __DEBUG__
+    if (client)
+      Serial.println("New client");
+#endif
   }
   else
   {
@@ -62,6 +72,9 @@ void Server_Update()
     }
     else
     {
+#ifdef __DEBUG__
+      Serial.println("Client disconnected");
+#endif
       client.stop();
     }
   }
@@ -112,14 +125,17 @@ void l_ParsePacket(uint8_t c)
       break;
 
     case WAITING_FOR_CHECKSUM:
-      Serial.println();
-
-      Serial.print(l_SharePacket.checksum, HEX);
-      Serial.print(" vs. ");
-      Serial.println(c, HEX);
-
       if (c == l_SharePacket.checksum)
         l_HandleCommand((COMMAND_PAYLOAD*)l_SharePacket.payload);
+#ifdef __DEBUG__
+      else
+      {
+        Serial.print("Invalid checksum ");
+        Serial.print(c, HEX);
+        Serial.print(" vs. ");
+        Serial.println(l_SharePacket.checksum);
+      }
+#endif
       l_CurrentParseState = WAITING_FOR_STX;
       break;
   }
@@ -130,6 +146,7 @@ void l_HandleCommand(COMMAND_PAYLOAD* p)
   switch (p->cmd)
   {
     case SEND_FILE:
+      l_ProcessSendFile(p);
       break;
 
     case VALIDATE_FILE:
@@ -183,6 +200,10 @@ void l_ProcessSensorList(COMMAND_PAYLOAD* p)
   LIST_SENSORS_RSP rsp;
   SENSOR_ENTRY* sensor = NULL;
 
+#ifdef __DEBUG__
+  Serial.println(__FUNCTION__);
+#endif
+
   msg = (LIST_SENSORS_MSG*)p->baggage;
 
   rsp.index = msg->index;
@@ -205,6 +226,10 @@ void l_ProcessSensorUpdate(COMMAND_PAYLOAD* p)
   UPDATE_SENSOR_MSG* msg;
   UPDATE_SENSOR_RSP rsp;
   SENSOR_ENTRY *sensor = NULL;
+
+#ifdef __DEBUG__
+  Serial.println(__FUNCTION__);
+#endif
 
   msg = (UPDATE_SENSOR_MSG*)p->baggage;
 
@@ -232,6 +257,10 @@ void l_ProcessSendFile(COMMAND_PAYLOAD *p)
   uint16_t desiredpage;
   uint8_t pageoffset;
 
+#ifdef __DEBUG__
+  Serial.println(__FUNCTION__);
+#endif
+
   msg = (SEND_FILE_MSG*)p->baggage;
 
   if (msg->len > 0)
@@ -243,9 +272,34 @@ void l_ProcessSendFile(COMMAND_PAYLOAD *p)
     {
       //The first byte is used to detemine whether or not there is a file to load
       if (BufferDirty)
-        l_ExtEEPROM.write((CurrentFilePage * 128) + 1, SendFileBuffer, EEPROM_PAGE_SIZE);
+      {
+#ifndef __DEBUG__
+        l_ExtEEPROM.write(CurrentFilePage * EEPROM_PAGE_SIZE, SendFileBuffer, EEPROM_PAGE_SIZE);
+#else
+        Serial.print("Index: ");
+        Serial.print(msg->index);
+        Serial.print("\tPage ");
+        Serial.print(CurrentFilePage);
+        Serial.print(" vs. ");
+        Serial.print(desiredpage);
+        for (uint8_t i = 0; i < EEPROM_PAGE_SIZE; i++)
+        {
+          if (!(i & 0x0F))
+            Serial.println();
 
-      l_ExtEEPROM.read((desiredpage * 128) + 1, SendFileBuffer, EEPROM_PAGE_SIZE);
+          if (SendFileBuffer[i] < 0x10)
+            Serial.print('0');
+          Serial.print(SendFileBuffer[i], HEX);
+        }
+
+#endif
+      }
+
+#ifndef __DEBUG__
+      l_ExtEEPROM.read(desiredpage * EEPROM_PAGE_SIZE, SendFileBuffer, EEPROM_PAGE_SIZE);
+#else
+      memset(SendFileBuffer, 0, EEPROM_PAGE_SIZE);
+#endif
 
       CurrentFilePage = desiredpage;
       BufferDirty = false;
@@ -253,7 +307,12 @@ void l_ProcessSendFile(COMMAND_PAYLOAD *p)
 
     //Check if data is actually changing, to save the EEPROM from excessive writes
     if (memcmp(SendFileBuffer + pageoffset, msg->data, msg->len))
+    {
       BufferDirty = true;
+#ifdef __DEBUG__
+      Serial.println("Dirty");
+#endif
+    }
 
     memcpy(SendFileBuffer + pageoffset, msg->data, msg->len);
 
@@ -262,18 +321,35 @@ void l_ProcessSendFile(COMMAND_PAYLOAD *p)
   }
   else //A 0 length message forces a flush of whatever is in the page buffer
   {
-    l_ExtEEPROM.write((CurrentFilePage * 128) + 1, SendFileBuffer, EEPROM_PAGE_SIZE);
+#ifndef __DEBUG__
+    l_ExtEEPROM.write(CurrentFilePage * EEPROM_PAGE_SIZE, SendFileBuffer, EEPROM_PAGE_SIZE);
+#else
+    Serial.print("Page ");
+    Serial.print(CurrentFilePage);
+    for (uint8_t i = 0; i < EEPROM_PAGE_SIZE; i++)
+    {
+      if (!(i & 0x0F))
+        Serial.println();
+
+      if (SendFileBuffer[i] < 0x10)
+        Serial.print('0');
+      Serial.print(SendFileBuffer[i], HEX);
+      Serial.print('\t');
+    }
+#endif
 
     rsp.index = msg->index;
-    rsp.ack = 0;    
+    rsp.ack = 0;
   }
-  
+
   l_BuildAndSendPacket(SEND_FILE, (uint8_t*)&rsp, sizeof(rsp));
 }
 
 void l_ProcessLoadFile(COMMAND_PAYLOAD *p)
 {
-
+#ifdef __DEBUG__
+  Serial.println(__FUNCTION__);
+#endif
 }
 
 void l_ProcessValidateFile(COMMAND_PAYLOAD *p)

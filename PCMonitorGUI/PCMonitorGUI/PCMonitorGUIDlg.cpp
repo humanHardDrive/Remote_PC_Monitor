@@ -293,7 +293,19 @@ void CPCMonitorGUIDlg::OnBnClickedLstsnsbtn()
 
 void CPCMonitorGUIDlg::OnBnClickedSndfilebtn()
 {
-	//Handled by background thread
+	uint8_t buffer[EEPROM_PAGE_SIZE / 2];
+
+	for (uint8_t i = 0; i < EEPROM_PAGE_SIZE / 2; i++)
+		buffer[i] = i;
+
+	m_Commander.SendFile(0, buffer, EEPROM_PAGE_SIZE / 2);
+
+	for (uint8_t i = 0; i < EEPROM_PAGE_SIZE / 2; i++)
+		buffer[i] = EEPROM_PAGE_SIZE/2 - i;
+
+	m_Commander.SendFile(EEPROM_PAGE_SIZE / 2, buffer, EEPROM_PAGE_SIZE / 2);
+
+	m_Commander.SendFile(0, NULL, 0);
 }
 
 
