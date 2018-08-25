@@ -1,5 +1,6 @@
 #include "Server.h"
 #include "SensorManager.h"
+#include "Menu.h"
 
 void setup()
 {
@@ -10,6 +11,9 @@ void setup()
 
 void loop()
 {
+  if(Serial.available())
+    Menu_Update((uint8_t)Serial.read());
+  
   Server_Update();
   SensorManager_Update();
 }

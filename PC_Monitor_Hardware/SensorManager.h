@@ -4,6 +4,7 @@
 #include <stdint.h>
 
 #define TABLE_END	-1
+#define DEFAULT_UPDATE_PERIOD 1000
 
 typedef uint16_t (*SensorUpdateFn)(void);
 
@@ -26,6 +27,7 @@ struct SENSOR_ENTRY
 
 SENSOR_ENTRY* SensorManager_GetEntry(SENSOR_LIST index);
 void SensorManager_Update();
+void SensorManager_Poll();
 
 void SensorManager_SetUpdatePeriod(uint16_t ms);
 

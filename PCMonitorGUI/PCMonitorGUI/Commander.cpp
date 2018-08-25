@@ -24,7 +24,7 @@ void Commander::StartListener()
 	m_PacketParseThread = std::thread(&Commander::PacketParsingThread, this);
 }
 
-bool Commander::SendFile(uint32_t index, uint8_t * buf, uint8_t len)
+bool Commander::SendFile(uint32_t index, uint8_t * buf, uint8_t len, uint8_t* ack)
 {
 	SEND_FILE_MSG msg;
 	SEND_FILE_RSP rsp;
@@ -44,6 +44,7 @@ bool Commander::SendFile(uint32_t index, uint8_t * buf, uint8_t len)
 	if (payload)
 	{
 		memcpy(&rsp, payload->baggage, sizeof(rsp));
+		*ack = rsp.ack;
 
 		return true;
 	}

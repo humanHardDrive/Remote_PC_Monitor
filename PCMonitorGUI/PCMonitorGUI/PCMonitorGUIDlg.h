@@ -49,6 +49,8 @@ protected:
 	void UpdateSensorList();
 	void SendFile();
 
+	void ParseHexFile(std::vector<FILE_INFO> &infos, std::vector<uint8_t> &data);
+
 	public:
 	afx_msg void OnBnClickedConnectbtn();
 

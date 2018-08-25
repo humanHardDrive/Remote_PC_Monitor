@@ -12,6 +12,23 @@
 #endif
 
 
+enum HEX_PARSING_STATE
+{
+	START_OF_LINE = 0,
+	BYTE_COUNT_0,
+	BYTE_COUNT_1,
+	ADDRESS_0,
+	ADDRESS_1,
+	ADDRESS_2,
+	ADDRESS_3,
+	RECORD_TYPE_0,
+	RECORD_TYPE_1,
+	DATA_0,
+	DATA_1,
+	CHECKSUM_0,
+	CHECKSUM_1
+};
+
 // CAboutDlg dialog used for App About
 
 class CAboutDlg : public CDialogEx
@@ -252,29 +269,211 @@ void CPCMonitorGUIDlg::UpdateSensorList()
 
 void CPCMonitorGUIDlg::SendFile()
 {
+	uint8_t failedmessagecount = 0;
+	uint32_t index = 0;
+	uint8_t ack = 1;
+
+	std::vector<uint8_t> data;
+	std::vector<FILE_INFO> info;
+
+	ParseHexFile(info, data);
+
+	m_SendingFile = false;
+}
+
+static uint8_t HexDigitToDecimal(char c)
+{
+	switch (c)
+	{
+	case '0':
+	case '1':
+	case '2':
+	case '3':
+	case '4':
+	case '5':
+	case '6':
+	case '7':
+	case '8':
+	case '9':
+		return (uint8_t)(c - '0');
+		break;
+
+	case 'A':
+	case 'a':
+		return 10;
+		break;
+
+	case 'B':
+	case 'b':
+		return 11;
+		break;
+
+	case 'C':
+	case 'c':
+		return 12;
+		break;
+
+	case 'D':
+	case 'd':
+		return 13;
+		break;
+
+	case 'E':
+	case 'e':
+		return 14;
+		break;
+
+	case 'F':
+	case 'f':
+		return 15;
+		break;
+	}
+
+	return 0;
+}
+
+void CPCMonitorGUIDlg::ParseHexFile(std::vector<FILE_INFO>& infos, std::vector<uint8_t>& data)
+{
+	HEX_PARSING_STATE ParseState = START_OF_LINE;
+	uint8_t LineByteCount = 0, LineChecksum = 0, LineAddress = 0, LineRecordType = 0;
+	uint8_t ByteCount = 0, Checksum = 0, Data[32], buf[256];
+	uint32_t expectedaddress = 0;
+
 	CFile file;
-	uint8_t buf[EEPROM_PAGE_SIZE / 2];
-	uint32_t index = 0, bytesread = 0;
+	uint16_t bytesread;
+
+	data.clear();
+	infos.clear();
 
 	if (file.Open(m_FileToSend, CFile::modeRead | CFile::typeBinary))
 	{
-		bytesread = file.Read(buf, EEPROM_PAGE_SIZE / 2);
+		bytesread = file.Read(buf, 256);
 
 		while (bytesread > 0)
 		{
-			if (m_Commander.SendFile(index, buf, bytesread))
+			for (uint16_t i = 0; i < bytesread; i++)
 			{
-				index += EEPROM_PAGE_SIZE / 2;
-				bytesread = file.Read(buf, EEPROM_PAGE_SIZE / 2);
+				switch (ParseState)
+				{
+				case START_OF_LINE:
+					if (buf[i] == ':')
+					{
+						LineByteCount = LineChecksum = LineAddress = LineRecordType = 0;
+						ByteCount = Checksum = 0;
+						memset(Data, 0, sizeof(Data));
+
+						ParseState = BYTE_COUNT_0;
+					}
+					break;
+
+				case BYTE_COUNT_0:
+					LineByteCount = HexDigitToDecimal(buf[i]);
+
+					ParseState = BYTE_COUNT_1;
+					break;
+
+				case BYTE_COUNT_1:
+					LineByteCount *= 16;
+					LineByteCount += HexDigitToDecimal(buf[i]);
+
+					Checksum += LineByteCount;
+
+					ParseState = ADDRESS_0;
+					break;
+
+				case ADDRESS_0:
+					LineAddress = HexDigitToDecimal(buf[i]);
+
+					ParseState = ADDRESS_1;
+					break;
+
+				case ADDRESS_1:
+					LineAddress *= 16;
+					LineAddress += HexDigitToDecimal(buf[i]);
+
+					ParseState = ADDRESS_2;
+					break;
+
+				case ADDRESS_2:
+					LineAddress *= 16;
+					LineAddress += HexDigitToDecimal(buf[i]);
+
+					ParseState = ADDRESS_3;
+					break;
+
+				case ADDRESS_3:
+					LineAddress *= 16;
+					LineAddress += HexDigitToDecimal(buf[i]);
+
+					Checksum += LineAddress;
+
+					ParseState = RECORD_TYPE_0;
+					break;
+
+				case RECORD_TYPE_0:
+					LineRecordType = HexDigitToDecimal(buf[i]);
+
+					ParseState = RECORD_TYPE_1;
+					break;
+
+				case RECORD_TYPE_1:
+					LineRecordType *= 16;
+					LineRecordType += HexDigitToDecimal(buf[i]);
+
+					Checksum += LineRecordType;
+
+					if (LineByteCount > 0)
+						ParseState = DATA_0;
+					else
+						ParseState = CHECKSUM_0;
+					break;
+
+				case DATA_0:
+					Data[ByteCount] = HexDigitToDecimal(buf[i]);
+
+					ParseState = DATA_1;
+					break;
+
+				case DATA_1:
+					Data[ByteCount] *= 16;
+					Data[ByteCount] += HexDigitToDecimal(buf[i]);
+
+					Checksum += Data[ByteCount];
+
+					ByteCount++;
+					if (ByteCount >= LineByteCount)
+						ParseState = CHECKSUM_0;
+					else
+						ParseState = DATA_0;
+					break;
+
+				case CHECKSUM_0:
+					LineChecksum = HexDigitToDecimal(buf[i]);
+
+					ParseState = CHECKSUM_1;
+					break;
+
+				case CHECKSUM_1:
+					LineChecksum *= 16;
+					LineChecksum += HexDigitToDecimal(buf[i]);
+
+					Checksum = ~Checksum;
+					Checksum++;
+
+					if (Checksum == LineChecksum && LineRecordType == 0)
+					{
+						//do something
+						if(expectedaddress != LineAddress)
+					}
+
+					ParseState = START_OF_LINE;
+					break;
+				}
 			}
-			std::this_thread::yield();
 		}
 
-		while (!m_Commander.SendFile(0, NULL, 0))
-			std::this_thread::yield();
+		file.Close();
 	}
-
-	m_SendingFile = false;
 }
 
 
@@ -326,7 +525,7 @@ void CPCMonitorGUIDlg::OnBnClickedSndfilebtn()
 	if (m_SendFileThread.joinable())
 		m_SendFileThread.join();
 
-	CFileDialog dlg(true, _T("bin"), NULL, OFN_HIDEREADONLY, _T("BIN Files (*.bin)|*.bin|All Files (*.*)|*.*||"), this);
+	CFileDialog dlg(true, _T("hex"), NULL, OFN_HIDEREADONLY, _T("HEX Files (*.hex)|*.hex|All Files (*.*)|*.*||"), this);
 	if (dlg.DoModal() == IDOK)
 	{
 		m_FileToSend.Empty();

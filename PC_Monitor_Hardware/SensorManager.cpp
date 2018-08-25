@@ -8,8 +8,8 @@ uint16_t l_UpdateVoltageSensor();
 uint16_t l_UpdateTempSensor();
 uint16_t l_UpdateRHSensor();
 
-uint32_t l_LastUpdateTime;
-uint16_t l_UpdatePeriod;
+uint32_t l_LastUpdateTime = 0;
+uint16_t l_UpdatePeriod = DEFAULT_UPDATE_PERIOD;
 
 SENSOR_ENTRY SensorTable[] =
 {
@@ -46,15 +46,36 @@ SENSOR_ENTRY* SensorManager_GetEntry(SENSOR_LIST index)
 
 void SensorManager_Update()
 {
+  if(millis() - l_LastUpdateTime > l_UpdatePeriod)
+  {
+    SensorManager_Poll();
+    l_LastUpdateTime = millis();
+  }
+}
+
+void SensorManager_Poll()
+{
   SENSOR_ENTRY* sensor;
 
   for (uint8_t i = 0; i < ALL_SENSORS; i++)
   {
-    sensor = SensorManager_GetEntry(i);
+    sensor = SensorManager_GetEntry((SENSOR_LIST)i);
 
     if (sensor)
       sensor->lastknownval = sensor->fn();
   }
+}
+
+
+void SensorManager_SetUpdatePeriod(uint16_t ms)
+{
+  l_UpdatePeriod = ms;
+}
+
+
+uint16_t SensorManager_GetUpdatePeriod()
+{
+  return l_UpdatePeriod;
 }
 
 

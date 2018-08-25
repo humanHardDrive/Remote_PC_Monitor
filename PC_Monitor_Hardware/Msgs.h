@@ -14,12 +14,13 @@ enum COMMAND_TYPE
 {
 	NO_COMMAND = 0,
 	SEND_FILE,
+	SEND_FILE_INFO,
 	VALIDATE_FILE,
 	LOAD_FILE,
-  READ_FILE,
+	READ_FILE,
 	LIST_SENSORS,
 	UPDATE_SENSOR,
-  MODIFY_PARAMETER,
+	MODIFY_PARAMETER,
 	ALL_COMMANDS
 };
 
@@ -48,6 +49,12 @@ struct COMMAND_PAYLOAD
 {
 	uint8_t cmd;
 	uint8_t baggage[MAX_BAGGAGE_SIZE];
+};
+
+struct FILE_INFO
+{
+	uint32_t MemAdd; //Where the data segment gets stored in flash
+	uint32_t StorageAdd; //Where the data segment would be stored in EEPROM
 };
 
 struct SEND_FILE_MSG
