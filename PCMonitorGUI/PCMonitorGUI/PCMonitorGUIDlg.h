@@ -49,7 +49,7 @@ protected:
 	void UpdateSensorList();
 	void SendFile();
 
-	void ParseHexFile(std::vector<FILE_INFO> &infos, std::vector<uint8_t> &data);
+	uint32_t ParseHexFile(CString path, uint8_t* Binary, uint32_t maxsize);
 
 	public:
 	afx_msg void OnBnClickedConnectbtn();

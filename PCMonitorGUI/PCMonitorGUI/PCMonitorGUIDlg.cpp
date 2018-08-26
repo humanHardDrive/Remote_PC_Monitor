@@ -270,13 +270,33 @@ void CPCMonitorGUIDlg::UpdateSensorList()
 void CPCMonitorGUIDlg::SendFile()
 {
 	uint8_t failedmessagecount = 0;
-	uint32_t index = 0;
+	uint32_t index = 0, filesize = 0;
 	uint8_t ack = 1;
+	uint8_t BinaryFile[65536];
 
-	std::vector<uint8_t> data;
-	std::vector<FILE_INFO> info;
+	filesize = ParseHexFile(m_FileToSend, BinaryFile, 65536);
 
-	ParseHexFile(info, data);
+	if (filesize)
+	{
+		m_Commander.SendFile(SEND_FILE_RESET_INDEX, NULL, 0, &ack);
+
+		for (index = 0; index < filesize; index += EEPROM_PAGE_SIZE / 2)
+		{
+			uint8_t size = EEPROM_PAGE_SIZE / 2;
+			if (size > (filesize - index))
+				size = filesize - index;
+
+			if (m_Commander.SendFile(index, BinaryFile + index, size, &ack))
+			{
+				failedmessagecount = 0;
+			}
+			else
+				failedmessagecount++;
+		}
+
+		m_Commander.SendFile(0, NULL, 0, &ack);
+		m_Commander.SendFile(SEND_FILE_FINALIZE_INDEX, NULL, 0, &ack);
+	}
 
 	m_SendingFile = false;
 }
@@ -332,21 +352,20 @@ static uint8_t HexDigitToDecimal(char c)
 	return 0;
 }
 
-void CPCMonitorGUIDlg::ParseHexFile(std::vector<FILE_INFO>& infos, std::vector<uint8_t>& data)
+uint32_t CPCMonitorGUIDlg::ParseHexFile(CString path, uint8_t* Binary, uint32_t maxsize)
 {
 	HEX_PARSING_STATE ParseState = START_OF_LINE;
-	uint8_t LineByteCount = 0, LineChecksum = 0, LineAddress = 0, LineRecordType = 0;
-	uint8_t ByteCount = 0, Checksum = 0, Data[32], buf[256];
-	uint32_t expectedaddress = 0;
+	uint8_t LineByteCount = 0, LineChecksum = 0, LineRecordType = 0;
+	uint8_t ByteCount = 0, Checksum = 0, buf[256], Data[32];
+	uint16_t LineAddress = 0;
+	uint32_t TotalByteCount = 0;
 
 	CFile file;
 	uint16_t bytesread;
 
-	data.clear();
-	infos.clear();
-
-	if (file.Open(m_FileToSend, CFile::modeRead | CFile::typeBinary))
+	if (file.Open(path, CFile::modeRead | CFile::typeBinary))
 	{
+		memset(Binary, 0, maxsize);
 		bytesread = file.Read(buf, 256);
 
 		while (bytesread > 0)
@@ -358,9 +377,10 @@ void CPCMonitorGUIDlg::ParseHexFile(std::vector<FILE_INFO>& infos, std::vector<u
 				case START_OF_LINE:
 					if (buf[i] == ':')
 					{
-						LineByteCount = LineChecksum = LineAddress = LineRecordType = 0;
+						LineByteCount = LineChecksum = LineRecordType = 0;
+						LineAddress = 0;
 						ByteCount = Checksum = 0;
-						memset(Data, 0, sizeof(Data));
+						memset(Data, 0, 32);
 
 						ParseState = BYTE_COUNT_0;
 					}
@@ -391,6 +411,8 @@ void CPCMonitorGUIDlg::ParseHexFile(std::vector<FILE_INFO>& infos, std::vector<u
 					LineAddress *= 16;
 					LineAddress += HexDigitToDecimal(buf[i]);
 
+					Checksum += LineAddress;
+
 					ParseState = ADDRESS_2;
 					break;
 
@@ -405,7 +427,7 @@ void CPCMonitorGUIDlg::ParseHexFile(std::vector<FILE_INFO>& infos, std::vector<u
 					LineAddress *= 16;
 					LineAddress += HexDigitToDecimal(buf[i]);
 
-					Checksum += LineAddress;
+					Checksum += (LineAddress & 0xFF);
 
 					ParseState = RECORD_TYPE_0;
 					break;
@@ -460,20 +482,26 @@ void CPCMonitorGUIDlg::ParseHexFile(std::vector<FILE_INFO>& infos, std::vector<u
 					Checksum = ~Checksum;
 					Checksum++;
 
-					if (Checksum == LineChecksum && LineRecordType == 0)
+					if (Checksum == LineChecksum && LineRecordType == 0 &&
+						LineAddress >= APPLICATION_DATA_START)
 					{
-						//do something
-						if(expectedaddress != LineAddress)
+						uint16_t addr = LineAddress - APPLICATION_DATA_START;
+
+						memcpy(Binary + addr, Data, LineByteCount);
+						TotalByteCount += LineByteCount;
 					}
 
 					ParseState = START_OF_LINE;
 					break;
 				}
 			}
+			bytesread = file.Read(buf, 256);
 		}
 
 		file.Close();
 	}
+
+	return TotalByteCount;
 }
 
 
