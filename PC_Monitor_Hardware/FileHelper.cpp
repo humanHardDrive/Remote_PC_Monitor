@@ -7,16 +7,18 @@ uint8_t FileBuffer[EEPROM_PAGE_SIZE];
 uint16_t CurrentFilePage = FILE_DATA_PAGE;
 bool BufferDirty = false;
 
-uint16_t FileChecksum, FileLength;
+uint32_t FileLength;
+uint16_t FileChecksum;
 
 extEEPROM filemem(kbits_128, 1, 128);
 
 void File_init()
 {
+  CurrentFilePage = FILE_DATA_PAGE;
 #ifndef __DEBUG__
-      filemem.read(FILE_DATA_PAGE * EEPROM_PAGE_SIZE, FileBuffer, EEPROM_PAGE_SIZE);
+  filemem.read(FILE_DATA_PAGE * EEPROM_PAGE_SIZE, FileBuffer, EEPROM_PAGE_SIZE);
 #else
-      memset(FileBuffer, 0, EEPROM_PAGE_SIZE);
+  memset(FileBuffer, 0, EEPROM_PAGE_SIZE);
 #endif
 }
 
@@ -62,6 +64,9 @@ void File_write(uint32_t index, uint8_t* buf, uint8_t len)
     FileBuffer[pageoffset] = buf[i];
     pageoffset++;
   }
+
+  if (desiredpage * EEPROM_PAGE_SIZE + pageoffset > FileLength)
+    FileLength = (uint32_t)(desiredpage * EEPROM_PAGE_SIZE + pageoffset);
 }
 
 void File_read(uint32_t index, uint8_t* buf, uint8_t len)
@@ -101,11 +106,29 @@ void File_read(uint32_t index, uint8_t* buf, uint8_t len)
 void File_reset()
 {
   FileChecksum = FileLength = 0;
+  File_init();
 }
 
 void File_finalize()
 {
-  
+  uint32_t i;
+  uint16_t page = 0, pageoffset = EEPROM_PAGE_SIZE;
+  uint8_t buffer[EEPROM_PAGE_SIZE];
+
+  FileChecksum = 0;
+  for(i = 0; i < FileLength; i++)
+  {
+    if(pageoffset >= EEPROM_PAGE_SIZE)
+    {
+      pageoffset -= EEPROM_PAGE_SIZE;
+      page++;
+
+      filemem.read(page * EEPROM_PAGE_SIZE, buffer, EEPROM_PAGE_SIZE);
+    }
+
+    FileChecksum += buffer[pageoffset];
+    pageoffset++;
+  }
 }
 
 void File_flush()
@@ -134,7 +157,7 @@ void File_flush()
 }
 
 
-uint16_t File_GetFileLength()
+uint32_t File_GetFileLength()
 {
   return FileLength;
 }

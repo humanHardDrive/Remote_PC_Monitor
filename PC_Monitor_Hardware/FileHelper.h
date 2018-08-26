@@ -15,7 +15,7 @@ void File_reset();
 void File_finalize();
 void File_flush();
 
-uint16_t File_GetFileLength();
+uint32_t File_GetFileLength();
 uint16_t File_GetFileChecksum();
 
 #endif
