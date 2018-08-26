@@ -57,6 +57,9 @@ struct FILE_INFO
 	uint32_t StorageAdd; //Where the data segment would be stored in EEPROM
 };
 
+#define SEND_FILE_RESET_INDEX     0x10
+#define SEND_FILE_FINALIZE_INDEX  0x20
+
 struct SEND_FILE_MSG
 {
 	uint32_t index;

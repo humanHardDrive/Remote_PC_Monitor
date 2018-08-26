@@ -4,11 +4,6 @@
 #include "FileHelper.h"
 
 #include <SPI.h>
-#ifdef ETHERNET2
-#include <Ethernet2.h>
-#else
-#include <Ethernet.h>
-#endif
 
 #include <stdint.h>
 
@@ -21,6 +16,9 @@ PARSING_STATE l_CurrentParseState = WAITING_FOR_STX;
 
 uint8_t l_MessageCount = 0;
 PACKET_WRAPPER l_SharePacket;
+
+uint16_t l_BadChecksumCount, l_BadCommandCount, l_ClientCount;
+bool l_ServerRunning = false, l_ConnectionsAllowed = false;
 
 void l_ParsePacket(uint8_t c);
 void l_HandleCommand(COMMAND_PAYLOAD* p);
@@ -44,20 +42,27 @@ void Server_Begin()
   Serial.println(Ethernet.localIP());
 #endif
 
+  Server_ResetStatistics();
+
+  l_ServerRunning = true;
+  l_ConnectionsAllowed = true;
   client.stop();
 }
 
 
 void Server_Update()
 {
-  if (!client)
+  if (!client && l_ConnectionsAllowed)
   {
     client = server.available();
 
-#ifdef __DEBUG__
     if (client)
+    {
+      l_ClientCount++;
+#ifdef __DEBUG__
       Serial.println("New client");
 #endif
+    }
   }
   else
   {
@@ -75,6 +80,60 @@ void Server_Update()
     }
   }
 }
+
+
+bool Server_Running()
+{
+  return l_ServerRunning;
+}
+
+bool Server_ClientConnected()
+{
+  return (client);
+}
+
+IPAddress Server_GetLocalIP()
+{
+  return Ethernet.localIP();
+}
+
+bool Server_ConnectionsAllowed()
+{
+  return l_ConnectionsAllowed;
+}
+
+uint16_t Server_GetClientsConnected()
+{
+  return l_ClientCount;
+}
+
+uint16_t Server_GetBadChecksumCount()
+{
+  return l_BadChecksumCount;
+}
+
+uint16_t Server_GetBadMessageCount()
+{
+  return l_BadCommandCount;
+}
+
+
+void Server_ToggleConnectionsAllowed()
+{
+  if (!l_ConnectionsAllowed)
+    l_ConnectionsAllowed = true;
+  else
+  {
+    l_ConnectionsAllowed = false;
+    client.stop();
+  }
+}
+
+void Server_ResetStatistics()
+{
+  l_BadChecksumCount = l_BadCommandCount = l_ClientCount = 0;
+}
+
 
 
 void l_ParsePacket(uint8_t c)
@@ -123,15 +182,16 @@ void l_ParsePacket(uint8_t c)
     case WAITING_FOR_CHECKSUM:
       if (c == l_SharePacket.checksum)
         l_HandleCommand((COMMAND_PAYLOAD*)l_SharePacket.payload);
-#ifdef __DEBUG__
       else
       {
+        l_BadChecksumCount++;
+#ifdef __DEBUG__
         Serial.print("Invalid checksum ");
         Serial.print(c, HEX);
         Serial.print(" vs. ");
         Serial.println(l_SharePacket.checksum);
-      }
 #endif
+      }
       l_CurrentParseState = WAITING_FOR_STX;
       break;
   }
@@ -160,6 +220,7 @@ void l_HandleCommand(COMMAND_PAYLOAD* p)
       break;
 
     default:
+      l_BadCommandCount++;
 #ifdef __DEBUG__
       Serial.print("UNKNOWN ");
       Serial.println(p->cmd);
@@ -262,14 +323,19 @@ void l_ProcessSendFile(COMMAND_PAYLOAD *p)
   if (msg->len > 0)
   {
     File_write(msg->index, msg->data, msg->len);
-    
+
     rsp.index = msg->index;
     rsp.ack = 0;
   }
   else //A 0 length message forces a flush of whatever is in the page buffer
   {
-    File_flush();
-    
+    if (msg->index == SEND_FILE_RESET_INDEX)
+      File_reset();
+    else if (msg->index == SEND_FILE_FINALIZE_INDEX)
+      File_finalize();
+    else
+      File_flush();
+
     rsp.index = msg->index;
     rsp.ack = 0;
   }

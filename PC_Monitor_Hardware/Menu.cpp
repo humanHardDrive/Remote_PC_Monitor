@@ -1,5 +1,6 @@
 #include "Menu.h"
 #include "Msgs.h"
+#include "Server.h"
 #include "SensorManager.h"
 #include "FileHelper.h"
 
@@ -13,10 +14,13 @@ void l_GoToSensorMenu();
 
 //Server menu functions
 void l_DisplayServerInfo();
+void l_ResetServerStatistics();
+void l_ToggleAllowConnections();
 
 //EEPROM menu functions
 void l_ReadEEPROMPage();
 void l_WriteEEPROMPage();
+void l_ViewFileInfo();
 
 //Sensor menu functions
 void l_ListSensors();
@@ -44,6 +48,8 @@ MENU_OPTION MainMenu[] =
 MENU_OPTION ServerMenu[] =
 {
   {'1', "Info", l_DisplayServerInfo},
+  {'2', "Toggle Allow Connections", l_ToggleAllowConnections},
+  {'3', "Reset Statistics", l_ResetServerStatistics},
   {'\0', "", NULL}
 };
 
@@ -51,6 +57,7 @@ MENU_OPTION EEPROMMenu[] =
 {
   {'1', "Read Page", l_ReadEEPROMPage},
   {'2', "Write Page", l_WriteEEPROMPage},
+  {'3', "File Info", l_ViewFileInfo},
   {'\0', "", NULL}
 };
 
@@ -232,6 +239,43 @@ void l_GoToSensorMenu()
   Menu_Display(CurrentMenu, true);
 }
 
+
+/*---------------Server Function Definitions--------------------*/
+void l_DisplayServerInfo()
+{
+  Serial.print(F("Running: "));
+  Serial.println(Server_Running() ? F("Y") : F("N"));
+  Serial.print(F("Local IP: "));
+  Serial.println(Server_GetLocalIP());
+  Serial.print(F("Active Client: "));
+  Serial.println(Server_ClientConnected() ? F("Y") : F("N"));
+  Serial.print(F("Connections Allowed: "));
+  Serial.println(Server_ConnectionsAllowed() ? F("Y") : F("N"));
+
+  Serial.print(F("Clients Connected: "));
+  Serial.println(Server_GetClientsConnected());
+  Serial.print(F("Bad Checksums: "));
+  Serial.println(Server_GetBadChecksumCount());
+  Serial.print(F("Invalid Commands: "));
+  Serial.println(Server_GetBadMessageCount());
+}
+
+void l_ResetServerStatistics()
+{
+  Server_ResetStatistics();
+  RETURN_ON_ESCAPE(true);
+}
+
+void l_ToggleAllowConnections()
+{
+  Server_ToggleConnectionsAllowed();
+  Serial.print(F("Connections Allowed: "));
+  Serial.println(Server_ConnectionsAllowed() ? F("Y") : F("N"));
+  
+  WAIT_FOR_KEY();
+}
+
+
 /*---------------EEPROM Function Definitions----------------*/
 void l_ReadEEPROMPage()
 {
@@ -339,6 +383,13 @@ void l_WriteEEPROMPage()
   File_write(page*EEPROM_PAGE_SIZE, buffer, strsize/2);
 }
 
+void l_ViewFileInfo()
+{
+  Serial.print(F("File Length: "));
+  Serial.println(File_GetFileLength());
+  Serial.print(F("Checksum: "));
+  Serial.println(File_GetFileChecksum(), HEX);
+}
 
 /*-----------------------Sensor menu functions------------------------------*/
 void l_ListSensors()
