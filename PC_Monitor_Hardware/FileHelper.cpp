@@ -2,22 +2,36 @@
 #include "Debug.h"
 #include "Msgs.h"
 
+#include <Wire.h>
+#include <string.h>
 #include <extEEPROM.h>
 
 uint8_t FileBuffer[EEPROM_PAGE_SIZE];
-uint16_t CurrentFilePage = FILE_DATA_PAGE;
-bool BufferDirty = false;
+uint16_t CurrentFileBufferPage = FILE_DATA_PAGE;
+bool FileBufferDirty = false;
 
 uint32_t FileLength;
 uint16_t FileChecksum;
 
-extEEPROM filemem(kbits_128, 1, 128);
+#ifdef USE_HARDWARE
+extEEPROM exteeprom(kbits_1024, 1, 128);
+#endif
 
 void File_init()
 {
-  CurrentFilePage = FILE_DATA_PAGE;
-#ifndef USE_HARDWARE
-  filemem.read(FILE_DATA_PAGE * EEPROM_PAGE_SIZE, FileBuffer, EEPROM_PAGE_SIZE);
+  byte i2cstat;
+  
+  CurrentFileBufferPage = 0;
+#ifdef USE_HARDWARE
+  i2cstat = exteeprom.begin(exteeprom.twiClock100kHz);
+
+#ifdef DEBUG_1
+  Serial.print(F("I2C Status: "));
+  Serial.print(i2cstat, HEX);
+  Serial.println();
+#endif
+  
+  exteeprom.read(CurrentFileBufferPage * EEPROM_PAGE_SIZE, FileBuffer, EEPROM_PAGE_SIZE);
 #else
   memset(FileBuffer, 0, EEPROM_PAGE_SIZE);
 #endif
@@ -29,7 +43,7 @@ uint8_t File_write(uint32_t index, uint8_t* buf, uint8_t len)
   uint16_t desiredpage, pageoffset;
   uint8_t retval = 0;
 
-  desiredpage = (index / EEPROM_PAGE_SIZE) + FILE_DATA_PAGE;
+  desiredpage = (index / EEPROM_PAGE_SIZE);
   pageoffset = index % EEPROM_PAGE_SIZE;
 
   for (uint8_t i = 0; i < len; i++)
@@ -40,34 +54,34 @@ uint8_t File_write(uint32_t index, uint8_t* buf, uint8_t len)
       desiredpage++;
     }
 
-    if (desiredpage != CurrentFilePage)
+    if (desiredpage != CurrentFileBufferPage)
     {
 #ifdef DEBUG_3
       Serial.print(F("Page mismatch: "));
       Serial.print(desiredpage, HEX);
       Serial.print(F(" vs "));
-      Serial.println(CurrentFilePage, HEX);
+      Serial.println(CurrentFileBufferPage, HEX);
 #endif
 
       retval = File_flush();
-      if(retval)
+      if (retval)
         return retval;
 
-#ifndef USE_HARDWARE
-      retval = filemem.read(desiredpage * EEPROM_PAGE_SIZE, FileBuffer, EEPROM_PAGE_SIZE);
-      if(retval)
+#ifdef USE_HARDWARE
+      retval = exteeprom.read(desiredpage * EEPROM_PAGE_SIZE, FileBuffer, EEPROM_PAGE_SIZE);
+      if (retval)
         return retval;
 #else
       memset(FileBuffer, 0, EEPROM_PAGE_SIZE);
 #endif
 
-      CurrentFilePage = desiredpage;
-      BufferDirty = false;
+      CurrentFileBufferPage = desiredpage;
+      FileBufferDirty = false;
     }
 
-    if (!BufferDirty && FileBuffer[pageoffset] != buf[i])
+    if (!FileBufferDirty && FileBuffer[pageoffset] != buf[i])
     {
-      BufferDirty = true;
+      FileBufferDirty = true;
 
 #ifdef DEBUG_3
       Serial.println("Dirty");
@@ -96,40 +110,40 @@ uint8_t File_read(uint32_t index, uint8_t* buf, uint8_t len)
   uint16_t desiredpage, pageoffset;
   uint8_t retval = 0;
 
-  desiredpage = (index / EEPROM_PAGE_SIZE) + FILE_DATA_PAGE;
+  desiredpage = (index / EEPROM_PAGE_SIZE);
   pageoffset = index % EEPROM_PAGE_SIZE;
 
   for (uint8_t i = 0; i < len; i++)
   {
-    if (pageoffset + i >= EEPROM_PAGE_SIZE)
+    if (pageoffset >= EEPROM_PAGE_SIZE)
     {
       pageoffset = 0;
       desiredpage++;
     }
 
-    if (desiredpage != CurrentFilePage)
+    if (desiredpage != CurrentFileBufferPage)
     {
 #ifdef DEBUG_3
       Serial.print(F("Page mismatch: "));
       Serial.print(desiredpage, HEX);
       Serial.print(F(" vs "));
-      Serial.println(CurrentFilePage, HEX);
+      Serial.println(CurrentFileBufferPage, HEX);
 #endif
 
       retval = File_flush();
-      if(retval)
+      if (retval)
         return retval;
 
-#ifndef USE_HARDWARE
-      retval = filemem.read(desiredpage * EEPROM_PAGE_SIZE, FileBuffer, EEPROM_PAGE_SIZE);
-      if(retval)
+#ifdef USE_HARDWARE
+      retval = exteeprom.read(desiredpage * EEPROM_PAGE_SIZE, FileBuffer, EEPROM_PAGE_SIZE);
+      if (retval)
         return retval;
 #else
       memset(FileBuffer, 0, EEPROM_PAGE_SIZE);
 #endif
 
-      CurrentFilePage = desiredpage;
-      BufferDirty = false;
+      CurrentFileBufferPage = desiredpage;
+      FileBufferDirty = false;
     }
 
     buf[i] = FileBuffer[pageoffset];
@@ -160,7 +174,7 @@ void File_finalize()
       page++;
 
 #ifdef USE_HARDWARE
-      filemem.read(page * EEPROM_PAGE_SIZE, buffer, EEPROM_PAGE_SIZE);
+      exteeprom.read(page * EEPROM_PAGE_SIZE, buffer, EEPROM_PAGE_SIZE);
 #else
       memset(buffer, 0, EEPROM_PAGE_SIZE);
 #endif
@@ -174,16 +188,16 @@ void File_finalize()
 uint8_t File_flush()
 {
   uint8_t retval = 0;
-  
-  if (BufferDirty)
+
+  if (FileBufferDirty)
   {
 #ifdef USE_HARDWARE
-    retval = filemem.write(CurrentFilePage * EEPROM_PAGE_SIZE, FileBuffer, EEPROM_PAGE_SIZE);
+    retval = exteeprom.write(CurrentFileBufferPage * EEPROM_PAGE_SIZE, FileBuffer, EEPROM_PAGE_SIZE);
 #endif
 
 #ifdef DEBUG_3
     Serial.print("Page ");
-    Serial.print(CurrentFilePage);
+    Serial.print(CurrentFileBufferPage);
     for (uint8_t i = 0; i < EEPROM_PAGE_SIZE; i++)
     {
       if (!(i & 0x0F))
@@ -196,7 +210,7 @@ uint8_t File_flush()
     }
     Serial.println();
 #endif
-    BufferDirty = false;
+    FileBufferDirty = false;
   }
 
   return retval;

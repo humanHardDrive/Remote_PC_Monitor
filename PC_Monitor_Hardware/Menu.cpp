@@ -20,6 +20,7 @@ void l_ToggleAllowConnections();
 //EEPROM menu functions
 void l_ReadEEPROMPage();
 void l_WriteEEPROMPage();
+void l_FlushFilePageBuffer();
 void l_ViewFileInfo();
 
 //Sensor menu functions
@@ -57,7 +58,8 @@ MENU_OPTION EEPROMMenu[] =
 {
   {'1', "Read Page", l_ReadEEPROMPage},
   {'2', "Write Page", l_WriteEEPROMPage},
-  {'3', "File Info", l_ViewFileInfo},
+  {'3', "Flush Page Buffer", l_FlushFilePageBuffer},
+  {'4', "File Info", l_ViewFileInfo},
   {'\0', "", NULL}
 };
 
@@ -77,6 +79,7 @@ MENU_OPTION SensorMenu[] =
 MENU_OPTION* MenuTable[] =
 {
   MainMenu,
+  ServerMenu,
   EEPROMMenu,
   NVRAMMenu,
   SensorMenu
@@ -284,6 +287,7 @@ void l_ReadEEPROMPage()
   uint16_t page;
   uint8_t retval = 0;
 
+  Serial.print(F("Page: "));
   page = GetNum(&quit);
   RETURN_ON_ESCAPE(quit);
 
@@ -390,6 +394,12 @@ void l_WriteEEPROMPage()
   Serial.println();
   Serial.print(F("Returns "));
   Serial.println(retval, HEX);
+}
+
+void l_FlushFilePageBuffer()
+{
+  File_flush();
+  RETURN_ON_ESCAPE(true);
 }
 
 void l_ViewFileInfo()

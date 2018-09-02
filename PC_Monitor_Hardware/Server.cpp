@@ -65,7 +65,7 @@ void Server_Update()
 #endif
     }
   }
-  else
+  else if(l_ConnectionsAllowed)
   {
     if (client.connected())
     {
