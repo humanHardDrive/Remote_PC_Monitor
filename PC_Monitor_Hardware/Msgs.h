@@ -17,9 +17,10 @@ enum COMMAND_TYPE
 	SEND_FILE_INFO,
 	VALIDATE_FILE,
 	LOAD_FILE,
-	READ_FILE,
 	LIST_SENSORS,
 	UPDATE_SENSOR,
+	LIST_PARAMETERS,
+	READ_PARAMETER,
 	MODIFY_PARAMETER,
 	ALL_COMMANDS
 };
@@ -60,6 +61,7 @@ struct FILE_INFO
 #define APPLICATION_DATA_START		0x4000
 #define SEND_FILE_RESET_INDEX		0x10
 #define SEND_FILE_FINALIZE_INDEX	0x20
+#define SEND_FILE_CLOSE_INDEX		0x00
 
 struct SEND_FILE_MSG
 {
@@ -68,6 +70,7 @@ struct SEND_FILE_MSG
 	uint8_t data[EEPROM_PAGE_SIZE/2];
 };
 
+#define ACK_OK		0
 struct SEND_FILE_RSP
 {
 	uint32_t index;
@@ -76,11 +79,33 @@ struct SEND_FILE_RSP
 
 struct VALIDATE_FILE_MSG
 {
+	uint32_t len;
+	uint16_t checksum;
 };
 
+#define FILE_VALID			0x00
+#define FILE_LEN_INVALID	0x01
+#define FILE_CHKSUM_INVALID	0x02
 struct VALIDATE_FILE_RSP
 {
+	//This is a bit field of the above
 	uint8_t valid;
+};
+
+//I'm using the load file to do a reset of the board
+#define REBOOT_ONLY			0
+#define REBOOT_LOAD_FILE	1
+//useful when changing server parameters
+struct LOAD_FILE_MSG
+{
+	uint8_t code;
+};
+
+#define ACK_OK			0
+#define ACK_NO_FILE		1
+struct LOAD_FILE_RSP
+{
+	uint8_t ack;
 };
 
 struct LIST_SENSORS_MSG
@@ -105,4 +130,38 @@ struct UPDATE_SENSOR_RSP
 	uint8_t index;
 	uint16_t val;
 	char scalar;
+};
+
+struct LIST_PARAMETERS_MSG
+{
+	uint8_t index;
+};
+
+struct LIST_PARAMETERS_RSP
+{
+	uint8_t index;
+	uint8_t len;
+	char name[114];
+};
+
+struct READ_PARAMETER_MSG
+{
+	uint8_t index;
+};
+
+struct READ_PARAMETER_RSP
+{
+	uint8_t index;
+	uint16_t val;
+};
+
+struct MODIFY_PARAMETER_MSG
+{
+	uint8_t index;
+	uint16_t val;
+};
+
+struct MODIFY_PARAMETER_RSP
+{
+	uint8_t index;
 };

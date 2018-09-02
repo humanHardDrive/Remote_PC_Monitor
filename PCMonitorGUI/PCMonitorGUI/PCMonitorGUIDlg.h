@@ -49,6 +49,11 @@ protected:
 	void UpdateSensorList();
 	void SendFile();
 
+	void UpdateConnectionStatus(bool connected);
+	void UpdateSensorListBox();
+	void UpdateParameterListBox();
+
+	void AddData(CListCtrl & ctrl, int row, int col, LPWSTR str);
 	uint32_t ParseHexFile(CString path, uint8_t* Binary, uint32_t maxsize);
 
 	public:
@@ -64,6 +69,7 @@ protected:
 	Commander m_Commander;
 
 	std::vector<std::pair<CString, float>> m_SensorList;
+	std::vector<std::pair<CString, uint16_t>> m_ParameterList;
 
 	bool m_BuildingSensorList, m_UpdatingSensorList, m_SensorListBuilt;
 	std::thread m_BuildSensorListThread;
@@ -73,6 +79,20 @@ protected:
 	bool m_SendingFile;
 	CString m_FileToSend;
 	std::thread m_SendFileThread;
+
+	CButton m_ConnectedChkBox;
+	CButton m_ConnectBtn;
+	CButton m_DisconnectBtn;
+
+	CButton m_SendFileBtn;
+	CButton m_ValidateFileBtn;
+	CButton m_ListSensorsBtn;
+	CButton m_UpdateSensorsBtn;
+
+	CProgressCtrl m_FileProgressBar;
+
+	CListCtrl m_SensorListBox;
+	CListCtrl m_ParameterListBox;
 
 	public:
 	afx_msg void OnBnClickedDisconnectbtn();

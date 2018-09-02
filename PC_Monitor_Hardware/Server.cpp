@@ -2,6 +2,7 @@
 #include "Msgs.h"
 #include "SensorManager.h"
 #include "FileHelper.h"
+#include "Debug.h"
 
 #include <SPI.h>
 
@@ -37,7 +38,7 @@ void Server_Begin()
   Ethernet.begin(mac);
   server.begin();
 
-#ifdef __DEBUG__
+#ifdef DEBUG_1
   Serial.print("Server is open at ");
   Serial.println(Ethernet.localIP());
 #endif
@@ -59,7 +60,7 @@ void Server_Update()
     if (client)
     {
       l_ClientCount++;
-#ifdef __DEBUG__
+#ifdef DEBUG_2
       Serial.println("New client");
 #endif
     }
@@ -73,7 +74,7 @@ void Server_Update()
     }
     else
     {
-#ifdef __DEBUG__
+#ifdef DEBUG_2
       Serial.println("Client disconnected");
 #endif
       client.stop();
@@ -185,7 +186,7 @@ void l_ParsePacket(uint8_t c)
       else
       {
         l_BadChecksumCount++;
-#ifdef __DEBUG__
+#ifdef DEBUG_3
         Serial.print("Invalid checksum ");
         Serial.print(c, HEX);
         Serial.print(" vs. ");
@@ -221,7 +222,7 @@ void l_HandleCommand(COMMAND_PAYLOAD* p)
 
     default:
       l_BadCommandCount++;
-#ifdef __DEBUG__
+#ifdef DEBUG_3
       Serial.print("UNKNOWN ");
       Serial.println(p->cmd);
 #endif
@@ -259,7 +260,7 @@ void l_ProcessSensorList(COMMAND_PAYLOAD* p)
   LIST_SENSORS_RSP rsp;
   SENSOR_ENTRY* sensor = NULL;
 
-#ifdef __DEBUG__
+#ifdef DEBUG_2
   Serial.println(__FUNCTION__);
 #endif
 
@@ -286,7 +287,7 @@ void l_ProcessSensorUpdate(COMMAND_PAYLOAD* p)
   UPDATE_SENSOR_RSP rsp;
   SENSOR_ENTRY *sensor = NULL;
 
-#ifdef __DEBUG__
+#ifdef DEBUG_2
   Serial.println(__FUNCTION__);
 #endif
 
@@ -314,7 +315,7 @@ void l_ProcessSendFile(COMMAND_PAYLOAD *p)
   SEND_FILE_MSG* msg;
   SEND_FILE_RSP rsp;
 
-#ifdef __DEBUG__
+#ifdef DEBUG_2
   Serial.println(__FUNCTION__);
 #endif
 
@@ -322,22 +323,20 @@ void l_ProcessSendFile(COMMAND_PAYLOAD *p)
 
   if (msg->len > 0)
   {
-    File_write(msg->index, msg->data, msg->len);
-
+    rsp.ack = File_write(msg->index, msg->data, msg->len);
     rsp.index = msg->index;
-    rsp.ack = 0;
   }
   else //A 0 length message forces a flush of whatever is in the page buffer
   {
+    rsp.ack = 0;
     if (msg->index == SEND_FILE_RESET_INDEX)
       File_reset();
     else if (msg->index == SEND_FILE_FINALIZE_INDEX)
       File_finalize();
     else
-      File_flush();
+          rsp.ack = File_flush();
 
     rsp.index = msg->index;
-    rsp.ack = 0;
   }
 
   l_BuildAndSendPacket(SEND_FILE, (uint8_t*)&rsp, sizeof(rsp));
@@ -345,14 +344,14 @@ void l_ProcessSendFile(COMMAND_PAYLOAD *p)
 
 void l_ProcessLoadFile(COMMAND_PAYLOAD *p)
 {
-#ifdef __DEBUG__
+#ifdef DEBUG_2
   Serial.println(__FUNCTION__);
 #endif
 }
 
 void l_ProcessValidateFile(COMMAND_PAYLOAD *p)
 {
-#ifdef __DEBUG__
+#ifdef DEBUG_2
   Serial.println(__FUNCTION__);
 #endif
 }

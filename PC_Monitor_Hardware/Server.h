@@ -1,8 +1,6 @@
 #ifndef __SERVER_H__
 #define __SERVER_H__
 
-#define __DEBUG__
-
 #define ETHERNET2
 
 #include <Arduino.h>

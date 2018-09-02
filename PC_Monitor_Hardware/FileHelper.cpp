@@ -1,4 +1,5 @@
 #include "FileHelper.h"
+#include "Debug.h"
 #include "Msgs.h"
 
 #include <extEEPROM.h>
@@ -15,7 +16,7 @@ extEEPROM filemem(kbits_128, 1, 128);
 void File_init()
 {
   CurrentFilePage = FILE_DATA_PAGE;
-#ifndef __DEBUG__
+#ifndef USE_HARDWARE
   filemem.read(FILE_DATA_PAGE * EEPROM_PAGE_SIZE, FileBuffer, EEPROM_PAGE_SIZE);
 #else
   memset(FileBuffer, 0, EEPROM_PAGE_SIZE);
@@ -23,9 +24,10 @@ void File_init()
 }
 
 
-void File_write(uint32_t index, uint8_t* buf, uint8_t len)
+uint8_t File_write(uint32_t index, uint8_t* buf, uint8_t len)
 {
   uint16_t desiredpage, pageoffset;
+  uint8_t retval = 0;
 
   desiredpage = (index / EEPROM_PAGE_SIZE) + FILE_DATA_PAGE;
   pageoffset = index % EEPROM_PAGE_SIZE;
@@ -40,10 +42,21 @@ void File_write(uint32_t index, uint8_t* buf, uint8_t len)
 
     if (desiredpage != CurrentFilePage)
     {
-      File_flush();
+#ifdef DEBUG_3
+      Serial.print(F("Page mismatch: "));
+      Serial.print(desiredpage, HEX);
+      Serial.print(F(" vs "));
+      Serial.println(CurrentFilePage, HEX);
+#endif
 
-#ifndef __DEBUG__
-      filemem.read(desiredpage * EEPROM_PAGE_SIZE, FileBuffer, EEPROM_PAGE_SIZE);
+      retval = File_flush();
+      if(retval)
+        return retval;
+
+#ifndef USE_HARDWARE
+      retval = filemem.read(desiredpage * EEPROM_PAGE_SIZE, FileBuffer, EEPROM_PAGE_SIZE);
+      if(retval)
+        return retval;
 #else
       memset(FileBuffer, 0, EEPROM_PAGE_SIZE);
 #endif
@@ -56,7 +69,7 @@ void File_write(uint32_t index, uint8_t* buf, uint8_t len)
     {
       BufferDirty = true;
 
-#ifdef __DEBUG__
+#ifdef DEBUG_3
       Serial.println("Dirty");
 #endif
     }
@@ -66,12 +79,22 @@ void File_write(uint32_t index, uint8_t* buf, uint8_t len)
   }
 
   if (desiredpage * EEPROM_PAGE_SIZE + pageoffset > FileLength)
+  {
     FileLength = (uint32_t)(desiredpage * EEPROM_PAGE_SIZE + pageoffset);
+
+#ifdef DEBUG_3
+    Serial.print(F("File length updated: "));
+    Serial.println(FileLength, HEX);
+#endif
+  }
+
+  return retval;
 }
 
-void File_read(uint32_t index, uint8_t* buf, uint8_t len)
+uint8_t File_read(uint32_t index, uint8_t* buf, uint8_t len)
 {
   uint16_t desiredpage, pageoffset;
+  uint8_t retval = 0;
 
   desiredpage = (index / EEPROM_PAGE_SIZE) + FILE_DATA_PAGE;
   pageoffset = index % EEPROM_PAGE_SIZE;
@@ -86,10 +109,21 @@ void File_read(uint32_t index, uint8_t* buf, uint8_t len)
 
     if (desiredpage != CurrentFilePage)
     {
-      File_flush();
+#ifdef DEBUG_3
+      Serial.print(F("Page mismatch: "));
+      Serial.print(desiredpage, HEX);
+      Serial.print(F(" vs "));
+      Serial.println(CurrentFilePage, HEX);
+#endif
 
-#ifndef __DEBUG__
-      filemem.read(desiredpage * EEPROM_PAGE_SIZE, FileBuffer, EEPROM_PAGE_SIZE);
+      retval = File_flush();
+      if(retval)
+        return retval;
+
+#ifndef USE_HARDWARE
+      retval = filemem.read(desiredpage * EEPROM_PAGE_SIZE, FileBuffer, EEPROM_PAGE_SIZE);
+      if(retval)
+        return retval;
 #else
       memset(FileBuffer, 0, EEPROM_PAGE_SIZE);
 #endif
@@ -101,6 +135,8 @@ void File_read(uint32_t index, uint8_t* buf, uint8_t len)
     buf[i] = FileBuffer[pageoffset];
     pageoffset++;
   }
+
+  return 0;
 }
 
 void File_reset()
@@ -116,14 +152,18 @@ void File_finalize()
   uint8_t buffer[EEPROM_PAGE_SIZE];
 
   FileChecksum = 0;
-  for(i = 0; i < FileLength; i++)
+  for (i = 0; i < FileLength; i++)
   {
-    if(pageoffset >= EEPROM_PAGE_SIZE)
+    if (pageoffset >= EEPROM_PAGE_SIZE)
     {
       pageoffset -= EEPROM_PAGE_SIZE;
       page++;
 
+#ifdef USE_HARDWARE
       filemem.read(page * EEPROM_PAGE_SIZE, buffer, EEPROM_PAGE_SIZE);
+#else
+      memset(buffer, 0, EEPROM_PAGE_SIZE);
+#endif
     }
 
     FileChecksum += buffer[pageoffset];
@@ -131,13 +171,17 @@ void File_finalize()
   }
 }
 
-void File_flush()
+uint8_t File_flush()
 {
+  uint8_t retval = 0;
+  
   if (BufferDirty)
   {
-#ifndef __DEBUG__
-    filemem.write(CurrentFilePage * EEPROM_PAGE_SIZE, FileBuffer, EEPROM_PAGE_SIZE);
-#else
+#ifdef USE_HARDWARE
+    retval = filemem.write(CurrentFilePage * EEPROM_PAGE_SIZE, FileBuffer, EEPROM_PAGE_SIZE);
+#endif
+
+#ifdef DEBUG_3
     Serial.print("Page ");
     Serial.print(CurrentFilePage);
     for (uint8_t i = 0; i < EEPROM_PAGE_SIZE; i++)
@@ -145,15 +189,17 @@ void File_flush()
       if (!(i & 0x0F))
         Serial.println();
 
-      if (SendFileBuffer[i] < 0x10)
+      if (FileBuffer[i] < 0x10)
         Serial.print('0');
-      Serial.print(SendFileBuffer[i], HEX);
+      Serial.print(FileBuffer[i], HEX);
       Serial.print(' ');
     }
     Serial.println();
 #endif
     BufferDirty = false;
   }
+
+  return retval;
 }
 
 

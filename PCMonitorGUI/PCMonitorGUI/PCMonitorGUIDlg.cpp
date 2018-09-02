@@ -78,9 +78,18 @@ CPCMonitorGUIDlg::CPCMonitorGUIDlg(CWnd* pParent /*=NULL*/)
 void CPCMonitorGUIDlg::DoDataExchange(CDataExchange* pDX)
 {
 	CDialogEx::DoDataExchange(pDX);
-	DDX_Text(pDX, IDC_LOGBOX, m_LoggingText);
 	DDX_Text(pDX, IDC_IPBOX2, m_IPAddress);
 	DDX_Text(pDX, IDC_PORTBOX, m_Port);
+	DDX_Control(pDX, IDC_CONNECTCHECK, m_ConnectedChkBox);
+	DDX_Control(pDX, IDC_CONNECTBTN, m_ConnectBtn);
+	DDX_Control(pDX, IDC_DISCONNECTBTN, m_DisconnectBtn);
+	DDX_Control(pDX, IDC_SNDFILEBTN, m_SendFileBtn);
+	DDX_Control(pDX, IDC_VALIDFILEBTN, m_ValidateFileBtn);
+	DDX_Control(pDX, IDC_LSTSNSBTN, m_ListSensorsBtn);
+	DDX_Control(pDX, IDC_UPDATESNSBTN, m_UpdateSensorsBtn);
+	DDX_Control(pDX, IDC_SENSORLIST, m_SensorListBox);
+	DDX_Control(pDX, IDC_PARAMLIST, m_ParameterListBox);
+	DDX_Control(pDX, IDC_FILEPROG, m_FileProgressBar);
 }
 
 BEGIN_MESSAGE_MAP(CPCMonitorGUIDlg, CDialogEx)
@@ -128,6 +137,8 @@ BOOL CPCMonitorGUIDlg::OnInitDialog()
 	SetIcon(m_hIcon, TRUE);			// Set big icon
 	SetIcon(m_hIcon, FALSE);		// Set small icon
 
+	UpdateConnectionStatus(false);
+
 	ShowWindow(SW_SHOW);
 
 	m_Commander.SetNetworkThread(&m_NetworkThread);
@@ -136,7 +147,8 @@ BOOL CPCMonitorGUIDlg::OnInitDialog()
 	m_BuildingSensorList = false;
 	m_UpdatingSensorList = false;
 
-	// TODO: Add extra initialization here
+	m_SensorList.clear();
+	m_ParameterList.clear();
 
 	return TRUE;  // return TRUE  unless you set the focus to a control
 }
@@ -204,8 +216,6 @@ void CPCMonitorGUIDlg::LogEvent(CString event)
 		m_LoggingText.AppendFormat(_T("%s\r\n"), tempQ.front());
 		tempQ.pop();
 	}
-
-	//UpdateData(FALSE);
 }
 
 void CPCMonitorGUIDlg::BuildSensorList()
@@ -242,6 +252,8 @@ void CPCMonitorGUIDlg::BuildSensorList()
 		std::this_thread::yield();
 	}
 
+	UpdateSensorListBox();
+
 	m_SensorListBuilt = true;
 	m_BuildingSensorList = false;
 }
@@ -264,6 +276,8 @@ void CPCMonitorGUIDlg::UpdateSensorList()
 		std::this_thread::yield();
 	}
 
+	UpdateSensorListBox();
+
 	m_UpdatingSensorList = false;
 }
 
@@ -271,6 +285,7 @@ void CPCMonitorGUIDlg::SendFile()
 {
 	uint8_t failedmessagecount = 0;
 	uint32_t index = 0, filesize = 0;
+	uint16_t checksum = 0;
 	uint8_t ack = 1;
 	uint8_t BinaryFile[65536];
 
@@ -278,27 +293,77 @@ void CPCMonitorGUIDlg::SendFile()
 
 	if (filesize)
 	{
-		m_Commander.SendFile(SEND_FILE_RESET_INDEX, NULL, 0, &ack);
+		while (ack != ACK_OK && failedmessagecount < 10)
+		{
+			if (!m_Commander.SendFile(SEND_FILE_RESET_INDEX, NULL, 0, &ack))
+				failedmessagecount++;
+			else
+				failedmessagecount = 0;
+		}
 
-		for (index = 0; index < filesize; index += EEPROM_PAGE_SIZE / 2)
+		ack = 1;
+		m_FileProgressBar.SetRange(0, (uint16_t)filesize);
+		while (index < filesize && failedmessagecount < 10)
 		{
 			uint8_t size = EEPROM_PAGE_SIZE / 2;
 			if (size > (filesize - index))
 				size = filesize - index;
 
+			for (uint8_t i = index; i < EEPROM_PAGE_SIZE / 2 && i < filesize; i++)
+				checksum += BinaryFile[i];
+
+			m_FileProgressBar.SetPos(index);
 			if (m_Commander.SendFile(index, BinaryFile + index, size, &ack))
 			{
+				if(ack == ACK_OK)
+					index += EEPROM_PAGE_SIZE / 2;
+
 				failedmessagecount = 0;
 			}
 			else
 				failedmessagecount++;
 		}
 
-		m_Commander.SendFile(0, NULL, 0, &ack);
-		m_Commander.SendFile(SEND_FILE_FINALIZE_INDEX, NULL, 0, &ack);
+		ack = 1;
+		while (ack != ACK_OK && failedmessagecount < 10)
+		{
+			if (!m_Commander.SendFile(SEND_FILE_CLOSE_INDEX, NULL, 0, &ack))
+				failedmessagecount++;
+			else
+				failedmessagecount = 0;
+		}
+
+		ack = 1;
+		while (ack != ACK_OK && failedmessagecount < 10)
+		{
+			if (!m_Commander.SendFile(SEND_FILE_FINALIZE_INDEX, NULL, 0, &ack))
+				failedmessagecount++;
+			else
+				failedmessagecount = 0;
+		}
 	}
 
 	m_SendingFile = false;
+}
+
+void CPCMonitorGUIDlg::UpdateConnectionStatus(bool connected)
+{
+	m_ConnectBtn.EnableWindow(!connected);
+	m_DisconnectBtn.EnableWindow(connected);
+	m_ConnectedChkBox.SetCheck(connected ? 1 : 0);
+
+	m_SendFileBtn.EnableWindow(connected);
+	m_ValidateFileBtn.EnableWindow(connected);
+	m_ListSensorsBtn.EnableWindow(connected);
+	m_UpdateSensorsBtn.EnableWindow(connected);
+}
+
+void CPCMonitorGUIDlg::UpdateSensorListBox()
+{
+}
+
+void CPCMonitorGUIDlg::UpdateParameterListBox()
+{
 }
 
 static uint8_t HexDigitToDecimal(char c)
@@ -350,6 +415,20 @@ static uint8_t HexDigitToDecimal(char c)
 	}
 
 	return 0;
+}
+
+void CPCMonitorGUIDlg::AddData(CListCtrl & ctrl, int row, int col, LPWSTR str)
+{
+	LVITEM lv;
+	lv.iItem = row;
+	lv.iSubItem = col;
+	lv.pszText = str;
+	lv.mask = LVIF_TEXT;
+
+	if (col == 0)
+		ctrl.InsertItem(&lv);
+	else
+		ctrl.SetItem(&lv);
 }
 
 uint32_t CPCMonitorGUIDlg::ParseHexFile(CString path, uint8_t* Binary, uint32_t maxsize)
@@ -515,17 +594,19 @@ void CPCMonitorGUIDlg::OnBnClickedConnectbtn()
 
 	if (m_NetworkThread.Connect())
 	{
-		LogEvent(_T("Success"));
 		m_Commander.StartListener();
+		OnBnClickedLstsnsbtn();
 	}
-	else
-		LogEvent(_T("Failed"));
+
+	UpdateConnectionStatus(m_NetworkThread.Connected());
 }
 
 
 void CPCMonitorGUIDlg::OnBnClickedDisconnectbtn()
 {
 	m_NetworkThread.Disconnect();
+
+	UpdateConnectionStatus(false);
 }
 
 

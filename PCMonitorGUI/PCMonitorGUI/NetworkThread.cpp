@@ -34,6 +34,9 @@ bool NetworkThread::Connect()
 {
 	if (m_Disconnected)
 	{
+		char IPBuffer[32], PortBuffer[32];
+		size_t bytesconverted;
+
 		// create WSADATA object
 		WSADATA wsaData;
 		this->m_NetworkSocket = INVALID_SOCKET;
@@ -60,8 +63,15 @@ bool NetworkThread::Connect()
 		hints.ai_socktype = SOCK_STREAM;
 		hints.ai_protocol = IPPROTO_TCP;  //TCP connection!!!
 
+		wcstombs_s(&bytesconverted, IPBuffer, 32, m_IP.GetBuffer(m_IP.GetLength()), 32);
+		wcstombs_s(&bytesconverted, PortBuffer, 32, m_Port.GetBuffer(m_Port.GetLength()), 32);
+
+		m_IP.ReleaseBuffer();
+		m_Port.ReleaseBuffer();
+
 		//resolve server address and port
-		iResult = getaddrinfo("192.168.1.177", "4040", &hints, &result);
+		//iResult = getaddrinfo("96.69.238.210", "4040", &hints, &result);
+		iResult = getaddrinfo((PCSTR)m_IP.GetBuffer(), (PCSTR)m_Port.GetBuffer(), &hints, &result);
 
 		if (iResult != 0)
 		{

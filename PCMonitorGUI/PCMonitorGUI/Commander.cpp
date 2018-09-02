@@ -38,13 +38,60 @@ bool Commander::SendFile(uint32_t index, uint8_t * buf, uint8_t len, uint8_t* ac
 	if(len > 0)
 		memcpy(msg.data, buf, len);
 	
-	BuildAndSendPacket(SEND_FILE, (uint8_t*)&msg, sizeof(msg));
+	BuildAndSendPacket(SEND_FILE, (uint8_t*)&msg, sizeof(SEND_FILE_MSG));
 
 	payload = WaitOnReturn(SEND_FILE);
 	if (payload)
 	{
-		memcpy(&rsp, payload->baggage, sizeof(rsp));
+		memcpy(&rsp, payload->baggage, sizeof(SEND_FILE_RSP));
 		*ack = rsp.ack;
+
+		return true;
+	}
+
+	return false;
+}
+
+bool Commander::ValidateFile(uint32_t len, uint16_t checksum, uint8_t& valid)
+{
+	VALIDATE_FILE_MSG msg;
+	VALIDATE_FILE_RSP rsp;
+	COMMAND_PAYLOAD* payload;
+
+	msg.len = len;
+	msg.checksum = checksum;
+	BuildAndSendPacket(VALIDATE_FILE, (uint8_t*)&msg, sizeof(VALIDATE_FILE_MSG));
+
+	payload = WaitOnReturn(VALIDATE_FILE);
+	if (payload)
+	{
+		memcpy(&rsp, payload->baggage, sizeof(VALIDATE_FILE_RSP));
+		valid = rsp.valid;
+
+		return true;
+	}
+
+	return false;
+}
+
+bool Commander::RebootSystem(bool loadfile, uint8_t& ack)
+{
+	LOAD_FILE_MSG msg;
+	LOAD_FILE_RSP rsp;
+	COMMAND_PAYLOAD* payload;
+
+	if (loadfile)
+		msg.code = REBOOT_LOAD_FILE;
+	else
+		msg.code = REBOOT_ONLY;
+
+	BuildAndSendPacket(LOAD_FILE, (uint8_t*)&msg, sizeof(LOAD_FILE_MSG));
+
+	payload = WaitOnReturn(LOAD_FILE);
+	if (payload)
+	{
+		memcpy(&rsp, payload->baggage, sizeof(LOAD_FILE_RSP));
+		ack = rsp.ack;
 
 		return true;
 	}
@@ -81,7 +128,7 @@ bool Commander::UpdateSensor(uint8_t index, float &val)
 	COMMAND_PAYLOAD* payload;
 
 	msg.index = index;
-	BuildAndSendPacket(UPDATE_SENSOR, (uint8_t*)&msg, sizeof(msg));
+	BuildAndSendPacket(UPDATE_SENSOR, (uint8_t*)&msg, sizeof(UPDATE_SENSOR_MSG));
 
 	payload = WaitOnReturn(UPDATE_SENSOR);
 	if (payload)
@@ -89,6 +136,67 @@ bool Commander::UpdateSensor(uint8_t index, float &val)
 		memcpy(&rsp, payload->baggage, sizeof(UPDATE_SENSOR_RSP));
 		val = (float)rsp.val * (float)pow(10, rsp.scalar);
 
+		return true;
+	}
+
+	return false;
+}
+
+bool Commander::ListControlParameters(uint8_t index, CString & name)
+{
+	LIST_PARAMETERS_MSG msg;
+	LIST_PARAMETERS_RSP rsp;
+	COMMAND_PAYLOAD* payload;
+
+	msg.index = index;
+	BuildAndSendPacket(LIST_PARAMETERS, (uint8_t*)&msg, sizeof(LIST_PARAMETERS_MSG));
+
+	payload = WaitOnReturn(LIST_PARAMETERS);
+	if (payload)
+	{
+		memcpy(&rsp, payload->baggage, sizeof(LIST_PARAMETERS_RSP));
+		name = CString(rsp.name, rsp.len);
+
+		return true;
+	}
+
+	return false;
+}
+
+bool Commander::ReadControlParameter(uint8_t index, uint16_t & val)
+{
+	READ_PARAMETER_MSG msg;
+	READ_PARAMETER_RSP rsp;
+	COMMAND_PAYLOAD* payload;
+
+	msg.index = index;
+	BuildAndSendPacket(READ_PARAMETER, (uint8_t*)&msg, sizeof(READ_PARAMETER_MSG));
+
+	payload = WaitOnReturn(READ_PARAMETER);
+	if (payload)
+	{
+		memcpy(&rsp, payload->baggage, sizeof(READ_PARAMETER_RSP));
+		val = rsp.val;
+
+		return true;
+	}
+
+	return false;
+}
+
+bool Commander::ModifyControlParameter(uint8_t index, uint16_t val)
+{
+	MODIFY_PARAMETER_MSG msg;
+	//MODIFY_PARAMETER_RSP rsp;
+	COMMAND_PAYLOAD* payload;
+
+	msg.index = index;
+	msg.val = val;
+	BuildAndSendPacket(MODIFY_PARAMETER, (uint8_t*)&msg, sizeof(MODIFY_PARAMETER_MSG));
+
+	payload = WaitOnReturn(MODIFY_PARAMETER);
+	if (payload)
+	{
 		return true;
 	}
 

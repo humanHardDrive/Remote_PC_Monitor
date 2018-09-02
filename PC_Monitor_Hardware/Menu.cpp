@@ -282,11 +282,12 @@ void l_ReadEEPROMPage()
   bool quit = false;
   uint8_t buffer[EEPROM_PAGE_SIZE];
   uint16_t page;
+  uint8_t retval = 0;
 
   page = GetNum(&quit);
   RETURN_ON_ESCAPE(quit);
 
-  File_read(page*EEPROM_PAGE_SIZE, buffer, EEPROM_PAGE_SIZE);
+  retval = File_read(page*EEPROM_PAGE_SIZE, buffer, EEPROM_PAGE_SIZE);
 
   for(uint8_t i = 0; i < EEPROM_PAGE_SIZE; i++)
   {
@@ -298,6 +299,10 @@ void l_ReadEEPROMPage()
     Serial.print(buffer[i], HEX);
     Serial.print(' ');
   }
+  
+  Serial.println();
+  Serial.print(F("Returns "));
+  Serial.println(retval, HEX);
 }
 
 uint8_t HexToDec(char h)
@@ -358,7 +363,7 @@ void l_WriteEEPROMPage()
   bool quit = false;
   uint8_t buffer[EEPROM_PAGE_SIZE];
   char strbuffer[2*EEPROM_PAGE_SIZE];
-  uint8_t strsize;
+  uint8_t strsize, retval;
   uint16_t page;
 
   Serial.print(F("NOTE: Excessive writting to EEPROM is discouraged. The number of write"));
@@ -380,7 +385,11 @@ void l_WriteEEPROMPage()
     buffer[i/2] += HexToDec(strbuffer[i]);
   }
 
-  File_write(page*EEPROM_PAGE_SIZE, buffer, strsize/2);
+  retval = File_write(page*EEPROM_PAGE_SIZE, buffer, strsize/2);
+
+  Serial.println();
+  Serial.print(F("Returns "));
+  Serial.println(retval, HEX);
 }
 
 void l_ViewFileInfo()
