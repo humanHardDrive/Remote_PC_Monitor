@@ -15,6 +15,9 @@
 
 #define MAX_EVENTS		100
 
+#define SENSOR_UPDATE_TIMER_ID		1000
+#define CONNECTION_CHECK_TIMER_ID	1001
+
 // CPCMonitorGUIDlg dialog
 class CPCMonitorGUIDlg : public CDialogEx
 {
@@ -41,6 +44,7 @@ protected:
 	afx_msg void OnSysCommand(UINT nID, LPARAM lParam);
 	afx_msg void OnPaint();
 	afx_msg HCURSOR OnQueryDragIcon();
+	afx_msg void OnTimer(UINT_PTR nIDEvent);
 	DECLARE_MESSAGE_MAP()
 
 	void LogEvent(CString event);
@@ -48,6 +52,9 @@ protected:
 	void BuildSensorList();
 	void UpdateSensorList();
 	void SendFile();
+
+	void BuildParameterList();
+	void ModifyParameter();
 
 	void UpdateConnectionStatus(bool connected);
 	void UpdateSensorListBox();
@@ -79,6 +86,10 @@ protected:
 	bool m_SendingFile;
 	CString m_FileToSend;
 	std::thread m_SendFileThread;
+
+	bool m_BuildingParameterList;
+	std::thread m_BuildParameterListThread;
+	std::mutex m_ParameterListLock;
 
 	CButton m_ConnectedChkBox;
 	CButton m_ConnectBtn;

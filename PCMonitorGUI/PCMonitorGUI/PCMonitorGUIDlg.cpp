@@ -102,6 +102,7 @@ BEGIN_MESSAGE_MAP(CPCMonitorGUIDlg, CDialogEx)
 	ON_BN_CLICKED(IDC_SNDFILEBTN, &CPCMonitorGUIDlg::OnBnClickedSndfilebtn)
 	ON_BN_CLICKED(IDC_VALIDFILEBTN, &CPCMonitorGUIDlg::OnBnClickedValidfilebtn)
 	ON_BN_CLICKED(IDC_UPDATESNSBTN, &CPCMonitorGUIDlg::OnBnClickedUpdatesnsbtn)
+	ON_WM_TIMER()
 	ON_WM_CLOSE()
 END_MESSAGE_MAP()
 
@@ -131,6 +132,9 @@ BOOL CPCMonitorGUIDlg::OnInitDialog()
 			pSysMenu->AppendMenu(MF_STRING, IDM_ABOUTBOX, strAboutMenu);
 		}
 	}
+
+	SetTimer(SENSOR_UPDATE_TIMER_ID, 1000, NULL);
+	SetTimer(CONNECTION_CHECK_TIMER_ID, 500, NULL);
 
 	// Set the icon for this dialog.  The framework does this automatically
 	//  when the application's main window is not a dialog
@@ -200,6 +204,19 @@ void CPCMonitorGUIDlg::OnPaint()
 HCURSOR CPCMonitorGUIDlg::OnQueryDragIcon()
 {
 	return static_cast<HCURSOR>(m_hIcon);
+}
+
+void CPCMonitorGUIDlg::OnTimer(UINT_PTR nIDEvent)
+{
+	if (nIDEvent == SENSOR_UPDATE_TIMER_ID)
+	{
+		OnBnClickedUpdatesnsbtn();
+	}
+	else if (nIDEvent == CONNECTION_CHECK_TIMER_ID)
+	{
+		if (!m_NetworkThread.Connected() && m_ConnectedChkBox.GetCheck())
+			UpdateConnectionStatus(false);
+	}
 }
 
 void CPCMonitorGUIDlg::LogEvent(CString event)
@@ -344,6 +361,15 @@ void CPCMonitorGUIDlg::SendFile()
 	}
 
 	m_SendingFile = false;
+}
+
+void CPCMonitorGUIDlg::BuildParameterList()
+{
+	m_ParameterList.clear();
+}
+
+void CPCMonitorGUIDlg::ModifyParameter()
+{
 }
 
 void CPCMonitorGUIDlg::UpdateConnectionStatus(bool connected)
@@ -612,6 +638,9 @@ void CPCMonitorGUIDlg::OnBnClickedDisconnectbtn()
 
 void CPCMonitorGUIDlg::OnBnClickedLstsnsbtn()
 {
+	if (!m_ConnectedChkBox.GetCheck())
+		return;
+
 	if (m_BuildingSensorList || m_UpdatingSensorList)
 		return;
 
@@ -628,6 +657,9 @@ void CPCMonitorGUIDlg::OnBnClickedLstsnsbtn()
 
 void CPCMonitorGUIDlg::OnBnClickedSndfilebtn()
 {
+	if (!m_ConnectedChkBox.GetCheck())
+		return;
+
 	if (m_SendingFile)
 		return;
 
@@ -650,12 +682,16 @@ void CPCMonitorGUIDlg::OnBnClickedSndfilebtn()
 
 void CPCMonitorGUIDlg::OnBnClickedValidfilebtn()
 {
-	//Handled by background thread
+	if (!m_ConnectedChkBox.GetCheck())
+		return;
 }
 
 
 void CPCMonitorGUIDlg::OnBnClickedUpdatesnsbtn()
 {
+	if (!m_ConnectedChkBox.GetCheck())
+		return;
+
 	if (m_BuildingSensorList || m_UpdatingSensorList || !m_SensorListBuilt)
 		return;
 
