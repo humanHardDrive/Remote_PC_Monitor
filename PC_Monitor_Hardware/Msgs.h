@@ -52,12 +52,6 @@ struct COMMAND_PAYLOAD
 	uint8_t baggage[MAX_BAGGAGE_SIZE];
 };
 
-struct FILE_INFO
-{
-	uint32_t MemAdd; //Where the data segment gets stored in flash
-	uint32_t StorageAdd; //Where the data segment would be stored in EEPROM
-};
-
 #define APPLICATION_DATA_START		0x4000
 #define SEND_FILE_RESET_INDEX		0x10
 #define SEND_FILE_FINALIZE_INDEX	0x20

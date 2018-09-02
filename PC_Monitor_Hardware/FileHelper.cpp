@@ -20,7 +20,7 @@ extEEPROM exteeprom(kbits_1024, 1, 128);
 void File_init()
 {
   byte i2cstat;
-  
+
   CurrentFileBufferPage = FILE_DATA_PAGE;
 #ifdef USE_HARDWARE
   i2cstat = exteeprom.begin(exteeprom.twiClock100kHz);
@@ -31,7 +31,7 @@ void File_init()
   Serial.print(i2cstat, HEX);
   Serial.println();
 #endif
-  
+
   exteeprom.read(CurrentFileBufferPage * EEPROM_PAGE_SIZE, FileBuffer, EEPROM_PAGE_SIZE);
 #else
   memset(FileBuffer, 0, EEPROM_PAGE_SIZE);
@@ -167,6 +167,7 @@ void File_finalize()
   uint32_t i;
   uint16_t page = 0, pageoffset = EEPROM_PAGE_SIZE;
   uint8_t buffer[EEPROM_PAGE_SIZE];
+  FILE_INFO fInfo;
 
   FileChecksum = 0;
   for (i = 0; i < FileLength; i++)
@@ -186,6 +187,26 @@ void File_finalize()
     FileChecksum += buffer[pageoffset];
     pageoffset++;
   }
+
+#ifdef DEBUG_3
+  Serial.println(__FUNCTION__);
+  Serial.print(F("Len: "));
+  Serial.print(FileLength, HEX);
+  Serial.print(F("\tChecksum: "));
+  Serial.println(FileChecksum, HEX);
+#endif
+
+#ifdef USE_HARDWARE
+  exteeprom.read(FILE_INFO_PAGE * EEPROM_PAGE_SIZE, (uint8_t*)&fInfo, sizeof(FILE_INFO));
+
+  if(fInfo.length != FileLength || fInfo.checksum != FileChecksum)
+  {
+    fInfo.length = FileLength;
+    fInfo.checksum = FileChecksum;
+
+    exteeprom.write(FILE_INFO_PAGE * EEPROM_PAGE_SIZE, (uint8_t*)&fInfo, sizeof(FILE_INFO));
+  }
+#endif
 }
 
 uint8_t File_flush()
@@ -199,6 +220,7 @@ uint8_t File_flush()
 #endif
 
 #ifdef DEBUG_3
+    Serial.println(__FUNCTION__);
     Serial.print("Page ");
     Serial.print(CurrentFileBufferPage);
     for (uint8_t i = 0; i < EEPROM_PAGE_SIZE; i++)

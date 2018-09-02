@@ -6,6 +6,12 @@
 #define FILE_INFO_PAGE  0
 #define FILE_DATA_PAGE  1
 
+struct FILE_INFO
+{
+  uint32_t length;
+  uint16_t checksum;
+};
+
 void File_init();
 
 uint8_t File_write(uint32_t index, uint8_t* buf, uint8_t len);
