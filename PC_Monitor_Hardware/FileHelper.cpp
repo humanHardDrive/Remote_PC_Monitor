@@ -21,11 +21,12 @@ void File_init()
 {
   byte i2cstat;
   
-  CurrentFileBufferPage = 0;
+  CurrentFileBufferPage = FILE_DATA_PAGE;
 #ifdef USE_HARDWARE
   i2cstat = exteeprom.begin(exteeprom.twiClock100kHz);
 
-#ifdef DEBUG_1
+#ifdef DEBUG_2
+  Serial.println(__FUNCTION__);
   Serial.print(F("I2C Status: "));
   Serial.print(i2cstat, HEX);
   Serial.println();
@@ -84,7 +85,9 @@ uint8_t File_write(uint32_t index, uint8_t* buf, uint8_t len)
       FileBufferDirty = true;
 
 #ifdef DEBUG_3
-      Serial.println("Dirty");
+      Serial.print(F("Page: "));
+      Serial.print(desiredpage, HEX);
+      Serial.println(F(" dirty"));
 #endif
     }
 
@@ -94,7 +97,7 @@ uint8_t File_write(uint32_t index, uint8_t* buf, uint8_t len)
 
   if (desiredpage * EEPROM_PAGE_SIZE + pageoffset > FileLength)
   {
-    FileLength = (uint32_t)(desiredpage * EEPROM_PAGE_SIZE + pageoffset);
+    FileLength = (uint32_t)((desiredpage - FILE_DATA_PAGE) * EEPROM_PAGE_SIZE + pageoffset);
 
 #ifdef DEBUG_3
     Serial.print(F("File length updated: "));
