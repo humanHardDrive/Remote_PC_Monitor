@@ -338,7 +338,7 @@ void l_ProcessSendFile(COMMAND_PAYLOAD *p)
 
   msg = (SEND_FILE_MSG*)p->baggage;
 
-#ifdef DEBUG_2
+#ifdef DEBUG_3
   Serial.print(F("Index: "));
   Serial.print(msg->index, HEX);
   Serial.print(F("\tLen: "));
@@ -363,7 +363,7 @@ void l_ProcessSendFile(COMMAND_PAYLOAD *p)
     rsp.index = msg->index;
   }
 
-#ifdef DEBUG_2
+#ifdef DEBUG_3
   Serial.print(F("ACK: "));
   Serial.println(rsp.ack, HEX);
 #endif
@@ -382,14 +382,14 @@ void l_ProcessLoadFile(COMMAND_PAYLOAD *p)
 
   msg = (LOAD_FILE_MSG*)p->baggage;
 
-#ifdef DEBUG_2
+#ifdef DEBUG_3
   Serial.print(F("Code: "));
   Serial.println(msg->code, HEX);
 #endif
 
   rsp.ack = NACK;
 
-#ifdef DEBUG_2
+#ifdef DEBUG_3
   Serial.print(F("ACK: "));
   Serial.println(rsp.ack, HEX);
 #endif
@@ -407,6 +407,27 @@ void l_ProcessValidateFile(COMMAND_PAYLOAD *p)
 #endif
 
   msg = (VALIDATE_FILE_MSG*)p->baggage;
+
+#ifdef DEBUG_3
+  Serial.print(F("Len: "));
+  Serial.print(msg->len, HEX);
+  Serial.print(F("\tChecksum: "));
+  Serial.println(msg->checksum, HEX);
+#endif
+
+  rsp.valid = FILE_VALID;
+  if(msg->len != File_GetFileLength())
+    rsp.valid |= FILE_LEN_INVALID;
+
+  if(msg->checksum != File_GetFileChecksum())
+    rsp.valid |= FILE_CHKSUM_INVALID;
+
+#ifdef DEBUG_3
+  Serial.print(F("Valid: "));
+  Serial.println(rsp.valid, HEX);
+#endif
+
+  l_BuildAndSendPacket(VALIDATE_FILE, (uint8_t*)&rsp, sizeof(rsp));
 }
 
 void l_ProcessListParameters(COMMAND_PAYLOAD* p)
