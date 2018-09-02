@@ -101,8 +101,9 @@ struct LOAD_FILE_MSG
 	uint8_t code;
 };
 
-#define ACK_OK			0
+#define ACK_OK			  0
 #define ACK_NO_FILE		1
+#define NACK          2
 struct LOAD_FILE_RSP
 {
 	uint8_t ack;

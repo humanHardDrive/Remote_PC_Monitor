@@ -30,8 +30,13 @@ uint8_t l_CalculateChecksum(PACKET_WRAPPER *p);
 void l_ProcessSendFile(COMMAND_PAYLOAD *p);
 void l_ProcessLoadFile(COMMAND_PAYLOAD *p);
 void l_ProcessValidateFile(COMMAND_PAYLOAD *p);
+
 void l_ProcessSensorList(COMMAND_PAYLOAD* p);
 void l_ProcessSensorUpdate(COMMAND_PAYLOAD *p);
+
+void l_ProcessListParameters(COMMAND_PAYLOAD* p);
+void l_ProcessReadParameter(COMMAND_PAYLOAD* p);
+void l_ProcessModifyParameter(COMMAND_PAYLOAD* p);
 
 void Server_Begin()
 {
@@ -65,7 +70,7 @@ void Server_Update()
 #endif
     }
   }
-  else if(l_ConnectionsAllowed)
+  else if (l_ConnectionsAllowed)
   {
     if (client.connected())
     {
@@ -220,6 +225,18 @@ void l_HandleCommand(COMMAND_PAYLOAD* p)
       l_ProcessSensorUpdate(p);
       break;
 
+    case LIST_PARAMETERS:
+      l_ProcessListParameters(p);
+      break;
+
+    case READ_PARAMETER:
+      l_ProcessReadParameter(p);
+      break;
+
+    case MODIFY_PARAMETER:
+      l_ProcessModifyParameter(p);
+      break;
+
     default:
       l_BadCommandCount++;
 #ifdef DEBUG_3
@@ -321,6 +338,13 @@ void l_ProcessSendFile(COMMAND_PAYLOAD *p)
 
   msg = (SEND_FILE_MSG*)p->baggage;
 
+#ifdef DEBUG_2
+  Serial.print(F("Index: "));
+  Serial.print(msg->index, HEX);
+  Serial.print(F("\tLen: "));
+  Serial.println(msg->len, HEX);
+#endif
+
   if (msg->len > 0)
   {
     rsp.ack = File_write(msg->index, msg->data, msg->len);
@@ -334,22 +358,72 @@ void l_ProcessSendFile(COMMAND_PAYLOAD *p)
     else if (msg->index == SEND_FILE_FINALIZE_INDEX)
       File_finalize();
     else
-          rsp.ack = File_flush();
+      rsp.ack = File_flush();
 
     rsp.index = msg->index;
   }
+
+#ifdef DEBUG_2
+  Serial.print(F("ACK: "));
+  Serial.println(rsp.ack, HEX);
+#endif
 
   l_BuildAndSendPacket(SEND_FILE, (uint8_t*)&rsp, sizeof(rsp));
 }
 
 void l_ProcessLoadFile(COMMAND_PAYLOAD *p)
 {
+  LOAD_FILE_MSG* msg;
+  LOAD_FILE_RSP rsp;
+
+#ifdef DEBUG_2
+  Serial.println(__FUNCTION__);
+#endif
+
+  msg = (LOAD_FILE_MSG*)p->baggage;
+
+#ifdef DEBUG_2
+  Serial.print(F("Code: "));
+  Serial.println(msg->code, HEX);
+#endif
+
+  rsp.ack = NACK;
+
+#ifdef DEBUG_2
+  Serial.print(F("ACK: "));
+  Serial.println(rsp.ack, HEX);
+#endif
+
+  l_BuildAndSendPacket(LOAD_FILE, (uint8_t*)&rsp, sizeof(rsp));
+}
+
+void l_ProcessValidateFile(COMMAND_PAYLOAD *p)
+{
+  VALIDATE_FILE_MSG* msg;
+  VALIDATE_FILE_RSP rsp;
+  
+#ifdef DEBUG_2
+  Serial.println(__FUNCTION__);
+#endif
+
+  msg = (VALIDATE_FILE_MSG*)p->baggage;
+}
+
+void l_ProcessListParameters(COMMAND_PAYLOAD* p)
+{
 #ifdef DEBUG_2
   Serial.println(__FUNCTION__);
 #endif
 }
 
-void l_ProcessValidateFile(COMMAND_PAYLOAD *p)
+void l_ProcessReadParameter(COMMAND_PAYLOAD* p)
+{
+#ifdef DEBUG_2
+  Serial.println(__FUNCTION__);
+#endif
+}
+
+void l_ProcessModifyParameter(COMMAND_PAYLOAD* p)
 {
 #ifdef DEBUG_2
   Serial.println(__FUNCTION__);
