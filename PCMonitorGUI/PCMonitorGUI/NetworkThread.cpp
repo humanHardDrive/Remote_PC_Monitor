@@ -71,7 +71,7 @@ bool NetworkThread::Connect()
 
 		//resolve server address and port
 		//iResult = getaddrinfo("96.69.238.210", "4040", &hints, &result);
-		iResult = getaddrinfo((PCSTR)m_IP.GetBuffer(), (PCSTR)m_Port.GetBuffer(), &hints, &result);
+		iResult = getaddrinfo(IPBuffer, PortBuffer, &hints, &result);
 
 		if (iResult != 0)
 		{

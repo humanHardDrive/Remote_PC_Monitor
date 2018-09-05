@@ -2,6 +2,7 @@
 #include "Msgs.h"
 #include "Server.h"
 #include "SensorManager.h"
+#include "ControlParam.h"
 #include "FileHelper.h"
 
 MENU CurrentMenu = MAIN_MENU;
@@ -28,16 +29,22 @@ void l_ListSensors();
 void l_ForceSensorUpdate();
 void l_ChangeUpdateTime();
 
-const char* MenuName[] = 
+//Control menu functions
+void l_DisplayParameters();
+void l_ModifyParemeters();
+void l_Reboot();
+
+const char* MenuName[] =
 {
   "MAIN MENU",
   "SERVER MENU",
   "EEPROM MENU",
   "NVRAM MENU",
   "SENSOR MENU"
+  "CONTROL MENU"
 };
 
-MENU_OPTION MainMenu[] = 
+MENU_OPTION MainMenu[] =
 {
   {'1', "Server", l_GoToServerMenu},
   {'2', "EEPROM", l_GoToEEPROMMenu},
@@ -73,6 +80,14 @@ MENU_OPTION SensorMenu[] =
   {'1', "List Sensors", l_ListSensors},
   {'2', "Force Sensor Update", l_ForceSensorUpdate},
   {'3', "Change Update Time", l_ChangeUpdateTime},
+  {'\0', "", NULL}
+};
+
+MENU_OPTION ControlMenu[] =
+{
+  {'1', "View Parameters", l_DisplayParameters},
+  {'2', "Modify Paremter", l_ModifyParemeters},
+  {'3', "Reboot", l_Reboot},
   {'\0', "", NULL}
 };
 
@@ -274,7 +289,7 @@ void l_ToggleAllowConnections()
   Server_ToggleConnectionsAllowed();
   Serial.print(F("Connections Allowed: "));
   Serial.println(Server_ConnectionsAllowed() ? F("Y") : F("N"));
-  
+
   WAIT_FOR_KEY();
 }
 
@@ -291,19 +306,19 @@ void l_ReadEEPROMPage()
   page = GetNum(&quit);
   RETURN_ON_ESCAPE(quit);
 
-  retval = File_read(page*EEPROM_PAGE_SIZE, buffer, EEPROM_PAGE_SIZE);
+  retval = File_read(page * EEPROM_PAGE_SIZE, buffer, EEPROM_PAGE_SIZE);
 
-  for(uint8_t i = 0; i < EEPROM_PAGE_SIZE; i++)
+  for (uint8_t i = 0; i < EEPROM_PAGE_SIZE; i++)
   {
-    if(!(i & 0x0F))
+    if (!(i & 0x0F))
       Serial.println();
 
-    if(buffer[i] < 0x10)
+    if (buffer[i] < 0x10)
       Serial.print('0');
     Serial.print(buffer[i], HEX);
     Serial.print(' ');
   }
-  
+
   Serial.println();
   Serial.print(F("Returns "));
   Serial.println(retval, HEX);
@@ -311,7 +326,7 @@ void l_ReadEEPROMPage()
 
 uint8_t HexToDec(char h)
 {
-  switch(h)
+  switch (h)
   {
     case '0':
     case '1':
@@ -323,42 +338,42 @@ uint8_t HexToDec(char h)
     case '7':
     case '8':
     case '9':
-    return (uint8_t)(h - '0');
-    break;
+      return (uint8_t)(h - '0');
+      break;
 
     case 'a':
     case 'A':
-    return 10;
-    break;
+      return 10;
+      break;
 
     case 'b':
     case 'B':
-    return 11;
-    break;
+      return 11;
+      break;
 
     case 'c':
     case 'C':
-    return 12;
-    break;
+      return 12;
+      break;
 
     case 'd':
     case 'D':
-    return 13;
-    break;
+      return 13;
+      break;
 
     case 'e':
     case 'E':
-    return 14;
-    break;
+      return 14;
+      break;
 
     case 'f':
     case 'F':
-    return 15;
-    break;
+      return 15;
+      break;
 
     default:
-    return 0;
-    break;
+      return 0;
+      break;
   }
 }
 
@@ -366,7 +381,7 @@ void l_WriteEEPROMPage()
 {
   bool quit = false;
   uint8_t buffer[EEPROM_PAGE_SIZE];
-  char strbuffer[2*EEPROM_PAGE_SIZE];
+  char strbuffer[2 * EEPROM_PAGE_SIZE];
   uint8_t strsize, retval;
   uint16_t page;
 
@@ -376,20 +391,20 @@ void l_WriteEEPROMPage()
 
   page = GetNum(&quit);
   RETURN_ON_ESCAPE(quit);
-  
+
   Serial.println();
   Serial.print(F("Data: "));
 
-  strsize = GetString(strbuffer, 2*EEPROM_PAGE_SIZE);
+  strsize = GetString(strbuffer, 2 * EEPROM_PAGE_SIZE);
   RETURN_ON_ESCAPE(!strsize);
-  
-  for(uint8_t i = 0; i < strsize; i++)
+
+  for (uint8_t i = 0; i < strsize; i++)
   {
-    buffer[i/2] *= 16;
-    buffer[i/2] += HexToDec(strbuffer[i]);
+    buffer[i / 2] *= 16;
+    buffer[i / 2] += HexToDec(strbuffer[i]);
   }
 
-  retval = File_write(page*EEPROM_PAGE_SIZE, buffer, strsize/2);
+  retval = File_write(page * EEPROM_PAGE_SIZE, buffer, strsize / 2);
 
   Serial.println();
   Serial.print(F("Returns "));
@@ -414,8 +429,8 @@ void l_ViewFileInfo()
 void l_ListSensors()
 {
   SENSOR_ENTRY* sen;
-  
-  for(uint8_t i = 0; i < ALL_SENSORS; i++)
+
+  for (uint8_t i = 0; i < ALL_SENSORS; i++)
   {
     sen = SensorManager_GetEntry((SENSOR_LIST)i);
 
@@ -449,7 +464,7 @@ void l_ChangeUpdateTime()
 
   Serial.println();
   Serial.print(F("New time: "));
-  
+
   time = GetNum(&quit);
   RETURN_ON_ESCAPE(quit);
 
@@ -458,3 +473,29 @@ void l_ChangeUpdateTime()
   l_ChangeUpdateTime();
 }
 
+
+/*---------------------------System Menu Functions----------------------*/
+void l_DisplayParameters()
+{
+  CTRL_PARAM *param;
+
+  for (uint8_t i = 0; i < ALL_PARAMETERS; i++)
+  {
+    param = ControlParam_GetParam(i);
+    Serial.print((int)(i + 1));
+    Serial.print(F(". "));
+    Serial.print(param->name);
+    Serial.print(F(": "));
+    Serial.println(param->val, HEX);
+  }
+}
+
+void l_ModifyParemeters()
+{
+  l_DisplayParameters();
+}
+
+void l_Reboot()
+{
+
+}

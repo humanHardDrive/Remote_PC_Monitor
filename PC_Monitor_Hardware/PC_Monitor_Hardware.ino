@@ -1,7 +1,8 @@
 #include "Server.h"
 #include "SensorManager.h"
 #include "FileHelper.h"
-#include "Menu.h"
+#include "ControlParam.h"
+//#include "Menu.h"
 #include "Debug.h"
 
 void setup()
@@ -16,6 +17,8 @@ void setup()
 #ifdef DEBUG_2
   Serial.println("Serial init");
 #endif
+
+  ControlParam_Load();
 
   File_init();
 
@@ -32,8 +35,8 @@ void setup()
 
 void loop()
 {
-  if (Serial.available())
-    Menu_Update(Serial.read());
+//  if (Serial.available())
+//    Menu_Update(Serial.read());
 
   Server_Update();
   SensorManager_Update();

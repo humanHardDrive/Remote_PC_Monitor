@@ -3,6 +3,7 @@
 #include "SensorManager.h"
 #include "FileHelper.h"
 #include "Debug.h"
+#include "ControlParam.h"
 
 #include <SPI.h>
 
@@ -10,7 +11,8 @@
 
 uint8_t mac[] = {0xDE, 0xAD, 0xBE, 0xEF, 0xFE, 0xED};
 
-EthernetServer server(4040);
+//EthernetServer server(4040);
+EthernetServer server(ControlParam_GetParam(SERVER_PORT)->val);
 EthernetClient client;
 
 PARSING_STATE l_CurrentParseState = WAITING_FOR_STX;

@@ -210,7 +210,7 @@ void CPCMonitorGUIDlg::OnTimer(UINT_PTR nIDEvent)
 {
 	if (nIDEvent == SENSOR_UPDATE_TIMER_ID)
 	{
-		OnBnClickedUpdatesnsbtn();
+		//OnBnClickedUpdatesnsbtn();
 	}
 	else if (nIDEvent == CONNECTION_CHECK_TIMER_ID)
 	{
@@ -326,7 +326,7 @@ void CPCMonitorGUIDlg::SendFile()
 			if (size > (filesize - index))
 				size = filesize - index;
 
-			for (uint8_t i = index; i < EEPROM_PAGE_SIZE / 2 && i < filesize; i++)
+			for (uint8_t i = index; (i - index) < EEPROM_PAGE_SIZE / 2 && i < filesize; i++)
 				checksum += BinaryFile[i];
 
 			m_FileProgressBar.SetPos(index);
